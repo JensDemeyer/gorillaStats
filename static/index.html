@@ -2,136 +2,1523 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GorillaStats</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="description" content="GorillaStats – Self-hosted Jungle Gym Workout Tracker">
+  <meta name="theme-color" content="#0d140e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>GorillaStats 🦍</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 16px; background: #121212; color: #f0f0f0; }
-    h2, h3 { margin-top: 0; color: #fff; }
-    .card { background: #1e1e1e; padding: 16px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-    label { display: block; font-size: 13px; margin-bottom: 4px; color: #aaa; }
-    select, input, button { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #333; background: #2a2a2a; color: #fff; font-size: 16px; box-sizing: border-box; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    button { background: #e63946; font-weight: bold; cursor: pointer; border: none; margin-top: 4px; }
-    button:active { background: #b82d38; }
-    #msg { color: #4caf50; font-weight: bold; text-align: center; margin-bottom: 8px; }
+    /* ===== DESIGN TOKENS ===== */
+    :root {
+      --bg-deep:      #0d140e;
+      --bg-base:      #121a13;
+      --bg-card:      #1c281e;
+      --bg-card2:     #162018;
+      --border:       #2d3f30;
+      --border-light: #3a5040;
+      --gold:         #d4a373;
+      --gold-bright:  #e69500;
+      --blood:        #e63946;
+      --blood-dark:   #b82d38;
+      --green-jungle: #3a7d44;
+      --green-muted:  #2a5c32;
+      --text-bright:  #f8f9fa;
+      --text-dim:     #95a597;
+      --text-muted:   #5c7060;
+      --pr-glow:      rgba(230, 149, 0, 0.4);
+      --shadow:       0 4px 20px rgba(0,0,0,0.5);
+      --shadow-card:  0 2px 12px rgba(0,0,0,0.4);
+      --radius:       12px;
+      --radius-sm:    8px;
+      --radius-lg:    16px;
+    }
+
+    /* ===== RESET & BASE ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: 'Barlow', sans-serif;
+      background: var(--bg-deep);
+      color: var(--text-bright);
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    /* ===== HEADER ===== */
+    header {
+      background: linear-gradient(135deg, #0a1009 0%, #1c280e 50%, #0d1a0f 100%);
+      border-bottom: 2px solid var(--border);
+      padding: 12px 16px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .logo {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .logo span { color: var(--text-dim); -webkit-text-fill-color: var(--text-dim); font-size: 1.4rem; }
+
+    /* ===== NAV TABS ===== */
+    nav {
+      display: flex;
+      gap: 2px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    nav::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      flex-shrink: 0;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 10px 16px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--text-dim); }
+    .tab-btn.active {
+      color: var(--gold-bright);
+      border-bottom-color: var(--gold-bright);
+    }
+
+    /* ===== MAIN CONTENT ===== */
+    main { padding: 16px; max-width: 600px; margin: 0 auto; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ===== CARDS ===== */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-card);
+    }
+    .card-title {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ===== STAT GRID (Dashboard) ===== */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .stat-card {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 12px;
+      text-align: center;
+    }
+    .stat-val {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 2rem;
+      font-weight: 900;
+      color: var(--gold-bright);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ===== FORM ELEMENTS ===== */
+    label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 5px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 14px 12px;
+      background: var(--bg-deep);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-bright);
+      font-family: 'Barlow', sans-serif;
+      font-size: 1rem;
+      margin-bottom: 12px;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+    select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2395a597' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+    .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .input-row .field { margin-bottom: 0; }
+    .field { margin-bottom: 0; }
+    .field input, .field select { margin-bottom: 0; }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--blood), var(--blood-dark));
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(230, 57, 70, 0.35);
+    }
+    .btn-primary:hover { box-shadow: 0 4px 20px rgba(230, 57, 70, 0.5); }
+    .btn-gold {
+      background: linear-gradient(135deg, var(--gold-bright), #c47800);
+      color: #0d140e;
+      box-shadow: 0 4px 15px rgba(230, 149, 0, 0.35);
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1.5px solid var(--border);
+      padding: 12px;
+    }
+    .btn-ghost:hover { border-color: var(--border-light); color: var(--text-bright); }
+    .btn-sm {
+      display: inline-block;
+      width: auto;
+      padding: 8px 14px;
+      font-size: 0.85rem;
+    }
+    .btn-danger { background: transparent; color: var(--blood); border: 1px solid var(--blood-dark); }
+    .btn-row { display: flex; gap: 8px; }
+    .btn-row .btn { flex: 1; }
+
+    /* ===== PREVIOUS SESSION HINT ===== */
+    #prevSession {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--green-jungle);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      display: none;
+    }
+    #prevSession strong { color: var(--gold); display: block; margin-bottom: 4px; font-size: 0.75rem; letter-spacing: 1px; text-transform: uppercase; }
+    #prevSession .prev-set { display: flex; gap: 8px; flex-wrap: wrap; }
+    .prev-set-chip {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+
+    /* ===== MEDIA BOX ===== */
+    #mediaBox {
+      position: relative;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      aspect-ratio: 16/7;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #mediaBox img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    #mediaPlaceholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      font-size: 2.5rem;
+    }
+    #mediaPlaceholder p { font-size: 0.75rem; letter-spacing: 1px; text-transform: uppercase; }
+    .media-upload-btn {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background: rgba(13,20,14,0.8);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-family: 'Barlow', sans-serif;
+    }
+
+    /* ===== REST TIMER ===== */
+    #timerOverlay {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(0deg, rgba(13,20,14,0.98) 0%, rgba(13,20,14,0.9) 100%);
+      border-top: 2px solid var(--gold);
+      padding: 16px;
+      z-index: 200;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+    }
+    #timerOverlay.visible { transform: translateY(0); }
+    .timer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .timer-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    #timerDisplay {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 4rem;
+      font-weight: 900;
+      color: var(--gold-bright);
+      line-height: 1;
+      text-align: center;
+      margin: 8px 0;
+      letter-spacing: 4px;
+    }
+    #timerDisplay.urgent { color: var(--blood); animation: pulse 0.5s ease infinite alternate; }
+    @keyframes pulse { from { opacity: 1; } to { opacity: 0.6; } }
+    .timer-progress {
+      width: 100%;
+      height: 4px;
+      background: var(--bg-deep);
+      border-radius: 2px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .timer-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--gold-bright), var(--gold));
+      border-radius: 2px;
+      transition: width 1s linear;
+    }
+    .timer-btns { display: flex; gap: 8px; }
+    .timer-preset {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .timer-preset:hover, .timer-preset.active { border-color: var(--gold); color: var(--gold); background: rgba(212,163,115,0.1); }
+    #skipTimer {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 14px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: 'Barlow', sans-serif;
+      font-size: 0.85rem;
+    }
+
+    /* ===== PR BANNER ===== */
+    #prBanner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(135deg, #7a4800, var(--gold-bright), #7a4800);
+      background-size: 200% 100%;
+      animation: shimmer 2s ease infinite;
+      padding: 20px;
+      text-align: center;
+      z-index: 300;
+      transform: translateY(-100%);
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    #prBanner.visible { transform: translateY(0); }
+    @keyframes shimmer { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+    .pr-text {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 900;
+      color: #0d140e;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .pr-sub { font-size: 0.9rem; color: rgba(13,20,14,0.7); margin-top: 4px; }
+
+    /* ===== TODAY LOG LIST ===== */
+    .log-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .log-item:last-child { border-bottom: none; }
+    .log-badge {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: 0.8rem;
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .log-badge.pr-badge { border-color: var(--gold); color: var(--gold-bright); background: rgba(212,163,115,0.1); }
+    .log-info { flex: 1; min-width: 0; }
+    .log-ex { font-size: 0.85rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-weight { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1rem; color: var(--text-bright); }
+    .log-del { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 6px; font-size: 1rem; flex-shrink: 0; }
+    .log-del:hover { color: var(--blood); }
+
+    /* ===== PR WALL ===== */
+    .pr-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .pr-item:last-child { border-bottom: none; }
+    .pr-icon { font-size: 1.3rem; flex-shrink: 0; }
+    .pr-details { flex: 1; }
+    .pr-exname { font-weight: 600; font-size: 0.95rem; color: var(--text-bright); }
+    .pr-meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* ===== CARDIO ===== */
+    .cardio-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .cardio-item:last-child { border-bottom: none; }
+    .cardio-type { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1rem; color: var(--text-bright); }
+    .cardio-meta { font-size: 0.8rem; color: var(--text-muted); }
+    .cardio-dur { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; color: var(--green-jungle); font-size: 1.1rem; }
+
+    /* ===== MODAL ===== */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 400;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      padding: 24px 20px;
+      width: 100%;
+      max-width: 600px;
+      max-height: 90dvh;
+      overflow-y: auto;
+    }
+    .modal-title {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 20px;
+    }
+
+    /* ===== CHART CONTAINER ===== */
+    .chart-wrap { position: relative; width: 100%; height: 220px; }
+    .chart-wrap canvas { max-height: 220px; }
+
+    /* ===== FILE INPUT ===== */
+    .file-input-wrap { position: relative; margin-bottom: 12px; }
+    .file-input-wrap input[type="file"] { opacity: 0; position: absolute; inset: 0; cursor: pointer; z-index: 2; }
+    .file-input-label {
+      display: block;
+      background: var(--bg-deep);
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .file-input-wrap:hover .file-input-label { border-color: var(--gold); color: var(--text-dim); }
+
+    /* ===== TOAST ===== */
+    #toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 30px;
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      color: var(--text-bright);
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 500;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state { text-align: center; padding: 30px 20px; color: var(--text-muted); }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 10px; }
+    .empty-state p { font-size: 0.9rem; }
+
+    /* ===== MISC ===== */
+    hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+    .section-gap { margin-top: 20px; }
+    .text-gold { color: var(--gold-bright); }
+    .text-muted { color: var(--text-muted); font-size: 0.85rem; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chip.active { background: rgba(212,163,115,0.15); border-color: var(--gold); color: var(--gold); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   </style>
 </head>
 <body>
-  <h2>GorillaStats 🦍</h2>
-  <div class="card">
-    <label>Routine</label>
-    <select id="routineSelect" onchange="renderExerciseSelect()"></select>
 
-    <label>Oefening</label>
-    <select id="exerciseSelect" onchange="loadChart()"></select>
+<!-- ===== HEADER ===== -->
+<header>
+  <div class="header-top">
+    <div class="logo">Gorilla<span>Stats</span> 🦍</div>
+    <div style="font-size:0.75rem;color:var(--text-muted);text-align:right;line-height:1.4;" id="headerDate"></div>
+  </div>
+  <nav>
+    <button class="tab-btn active" onclick="showTab('dashboard')" id="tab-dashboard">📊 Dashboard</button>
+    <button class="tab-btn" onclick="showTab('workout')" id="tab-workout">💪 Training</button>
+    <button class="tab-btn" onclick="showTab('cardio')" id="tab-cardio">🏃 Cardio</button>
+    <button class="tab-btn" onclick="showTab('bodyweight')" id="tab-bodyweight">⚖️ Gewicht</button>
+  </nav>
+</header>
 
-    <div class="grid">
-      <div>
-        <label>Set Nr</label>
-        <input type="number" id="setNr" value="1">
+<main>
+
+  <!-- ============================================================
+       DASHBOARD TAB
+  ============================================================ -->
+  <div class="page active" id="page-dashboard">
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-val" id="stat-tonnage">—</div>
+        <div class="stat-label">Tonnage Vandaag (kg)</div>
       </div>
-      <div>
-        <label>Reps</label>
-        <input type="number" id="reps" placeholder="8">
+      <div class="stat-card">
+        <div class="stat-val" id="stat-sessions">—</div>
+        <div class="stat-label">Sessies Totaal</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="stat-streak">—</div>
+        <div class="stat-label">Streak 🔥</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="stat-volume" style="font-size:1.4rem">—</div>
+        <div class="stat-label">All-Time Volume (kg)</div>
       </div>
     </div>
 
-    <label>Gewicht (kg)</label>
-    <input type="number" step="0.5" id="weight" placeholder="60.0">
+    <!-- PR Wall of Fame -->
+    <div class="card">
+      <div class="card-title">🏆 Wall of Fame — PRs</div>
+      <div id="prWall">
+        <div class="empty-state"><div class="icon">🦍</div><p>Nog geen PRs. Ga de boel kapotmaken!</p></div>
+      </div>
+    </div>
 
-    <label>Notities</label>
-    <input type="text" id="notes" placeholder="RPE 8, goeie vorm">
+    <!-- Progress chart -->
+    <div class="card">
+      <div class="card-title">📈 Progressie Grafiek</div>
+      <div class="field" style="margin-bottom:12px">
+        <label>Oefening</label>
+        <select id="dashExerciseSelect" onchange="loadProgressChart()"></select>
+      </div>
+      <div id="chartMetricRow" class="chip-row">
+        <span class="chip active" data-metric="max_weight" onclick="selectMetric(this)">Max Gewicht</span>
+        <span class="chip" data-metric="best_e1rm" onclick="selectMetric(this)">e1RM (Epley)</span>
+        <span class="chip" data-metric="total_volume" onclick="selectMetric(this)">Sessie Volume</span>
+      </div>
+      <div class="chart-wrap"><canvas id="progressChart"></canvas></div>
+    </div>
 
-    <div id="msg"></div>
-    <button onclick="submitLog()">Set Opslaan</button>
+    <!-- Today log -->
+    <div class="card">
+      <div class="card-title">📋 Sets Vandaag</div>
+      <div id="todayLog">
+        <div class="empty-state"><div class="icon">💤</div><p>Nog geen sets gelogd vandaag.</p></div>
+      </div>
+    </div>
+
+  </div><!-- /dashboard -->
+
+  <!-- ============================================================
+       WORKOUT TAB
+  ============================================================ -->
+  <div class="page" id="page-workout">
+
+    <!-- Exercise picker -->
+    <div class="card">
+      <div class="card-title">🏋️ Oefening Selecteren</div>
+
+      <div class="input-row" style="margin-bottom:12px">
+        <div class="field">
+          <label>Routine</label>
+          <select id="routineSelect" onchange="onRoutineChange()"></select>
+        </div>
+        <div class="field">
+          <label>Oefening</label>
+          <select id="exerciseSelect" onchange="onExerciseChange()"></select>
+        </div>
+      </div>
+
+      <!-- Media box -->
+      <div id="mediaBox">
+        <div id="mediaPlaceholder">
+          <div>🏋️</div>
+          <p>Geen media</p>
+        </div>
+        <img id="mediaImg" style="display:none" alt="Oefening demo">
+        <label class="media-upload-btn" for="mediaFileInput">📷 Upload</label>
+        <input type="file" id="mediaFileInput" accept="image/*,.gif" style="display:none" onchange="uploadMedia()">
+      </div>
+
+      <!-- Previous session -->
+      <div id="prevSession">
+        <strong>🕐 Vorige sessie</strong>
+        <div class="prev-set" id="prevSetChips"></div>
+      </div>
+
+      <!-- Set form -->
+      <div class="input-row">
+        <div class="field">
+          <label>Set Nr</label>
+          <input type="number" id="setNr" value="1" min="1" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label>Reps</label>
+          <input type="number" id="reps" placeholder="8" min="1" inputmode="numeric">
+        </div>
+      </div>
+      <div class="field">
+        <label>Gewicht (kg)</label>
+        <input type="number" step="0.5" id="weight" placeholder="60.0" inputmode="decimal">
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>Notities (optioneel)</label>
+        <input type="text" id="notes" placeholder="RPE 8, goeie set...">
+      </div>
+
+      <button class="btn btn-primary" onclick="submitLog()">💪 SET OPSLAAN</button>
+
+      <div style="margin-top:12px">
+        <button class="btn btn-ghost btn-sm" onclick="openAddExerciseModal()">+ Oefening Toevoegen</button>
+      </div>
+    </div>
+
+    <!-- Timer quick-access -->
+    <div class="card" style="padding:14px">
+      <div class="card-title" style="margin-bottom:10px">⏱️ Rusttimer</div>
+      <div class="timer-btns">
+        <div class="timer-preset" onclick="startTimer(60)">60s</div>
+        <div class="timer-preset" onclick="startTimer(90)">90s</div>
+        <div class="timer-preset" onclick="startTimer(120)">2m</div>
+        <div class="timer-preset" onclick="startTimer(180)">3m</div>
+      </div>
+    </div>
+
+  </div><!-- /workout -->
+
+  <!-- ============================================================
+       CARDIO TAB
+  ============================================================ -->
+  <div class="page" id="page-cardio">
+
+    <div class="card">
+      <div class="card-title">🏃 Cardio Loggen</div>
+
+      <label>Type</label>
+      <select id="cardioType">
+        <option>Loopband</option>
+        <option>Roeien</option>
+        <option>Stairmaster</option>
+        <option>Crosstrainer</option>
+        <option>Fietsen</option>
+        <option>Zwemmen</option>
+        <option>Andere</option>
+      </select>
+
+      <div class="input-row">
+        <div class="field">
+          <label>Duur (min)</label>
+          <input type="number" id="cardioDur" placeholder="20" min="1" inputmode="decimal">
+        </div>
+        <div class="field">
+          <label>Afstand (km)</label>
+          <input type="number" id="cardioDist" placeholder="3.0" step="0.1" inputmode="decimal">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>Calorieën (optioneel)</label>
+        <input type="number" id="cardioCal" placeholder="200" inputmode="numeric">
+      </div>
+
+      <button class="btn btn-gold" onclick="submitCardio()">🔥 CARDIO OPSLAAN</button>
+    </div>
+
+    <!-- Cardio history -->
+    <div class="card">
+      <div class="card-title">📋 Recente Cardio</div>
+      <div id="cardioHistory">
+        <div class="empty-state"><div class="icon">🏃</div><p>Nog geen cardio gelogd.</p></div>
+      </div>
+    </div>
+
+  </div><!-- /cardio -->
+
+  <!-- ============================================================
+       BODYWEIGHT TAB
+  ============================================================ -->
+  <div class="page" id="page-bodyweight">
+
+    <div class="card">
+      <div class="card-title">⚖️ Gewicht Loggen</div>
+
+      <div class="input-row">
+        <div class="field">
+          <label>Gewicht (kg)</label>
+          <input type="number" step="0.1" id="bwKg" placeholder="80.0" inputmode="decimal">
+        </div>
+        <div class="field">
+          <label>Vetpercentage (%)</label>
+          <input type="number" step="0.1" id="bwFat" placeholder="18.0" inputmode="decimal">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>Spiermassa (kg, optioneel)</label>
+        <input type="number" step="0.1" id="bwMuscle" placeholder="40.0" inputmode="decimal">
+      </div>
+
+      <button class="btn btn-gold" onclick="submitBodyweight()">💾 OPSLAAN</button>
+    </div>
+
+    <!-- Fitdays CSV import -->
+    <div class="card">
+      <div class="card-title">📂 Fitdays CSV Importeren</div>
+      <p class="text-muted" style="margin-bottom:12px">Exporteer je data vanuit de Fitdays app en upload het CSV-bestand hieronder.</p>
+      <div class="file-input-wrap">
+        <input type="file" id="csvFileInput" accept=".csv">
+        <label class="file-input-label" for="csvFileInput">📁 Kies CSV-bestand...</label>
+      </div>
+      <button class="btn btn-ghost" onclick="importCSV()">⬆️ Importeren</button>
+      <div id="importResult" style="margin-top:10px;font-size:0.85rem;color:var(--text-dim)"></div>
+    </div>
+
+    <!-- Weight chart -->
+    <div class="card">
+      <div class="card-title">📈 Gewichtsevolutie</div>
+      <div class="chart-wrap"><canvas id="bwChart"></canvas></div>
+    </div>
+
+  </div><!-- /bodyweight -->
+
+</main><!-- /main -->
+
+<!-- ===== REST TIMER OVERLAY ===== -->
+<div id="timerOverlay">
+  <div class="timer-header">
+    <span class="timer-label">⏱️ Rusttimer</span>
+    <button id="skipTimer" onclick="stopTimer()">Skip ✕</button>
   </div>
-
-  <div class="card">
-    <h3>Progressie</h3>
-    <canvas id="progressChart"></canvas>
+  <div id="timerDisplay">0:00</div>
+  <div class="timer-progress"><div class="timer-progress-bar" id="timerBar" style="width:100%"></div></div>
+  <div class="timer-btns">
+    <div class="timer-preset" onclick="startTimer(60)">60s</div>
+    <div class="timer-preset" onclick="startTimer(90)">90s</div>
+    <div class="timer-preset" onclick="startTimer(120)">2m</div>
+    <div class="timer-preset" onclick="startTimer(180)">3m</div>
   </div>
+</div>
 
-  <script>
-    let routinesData = {};
-    let chartInstance = null;
+<!-- ===== PR BANNER ===== -->
+<div id="prBanner">
+  <div class="pr-text">🔥 NIEUW PR! 🦍💪</div>
+  <div class="pr-sub" id="prBannerSub"></div>
+</div>
 
-    async function init() {
-      const res = await fetch('/api/routines');
-      routinesData = await res.json();
-      const routineSelect = document.getElementById('routineSelect');
-      routineSelect.innerHTML = Object.keys(routinesData).map(r => `<option value="${r}">${r}</option>`).join('');
-      renderExerciseSelect();
+<!-- ===== ADD EXERCISE MODAL ===== -->
+<div class="modal-backdrop" id="addExModal" onclick="closeModal(event, 'addExModal')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-title">+ Oefening Toevoegen</div>
+    <label>Routine</label>
+    <input type="text" id="newRoutine" placeholder="Push / Pull / Legs / ..." list="routineDatalist">
+    <datalist id="routineDatalist"></datalist>
+    <label>Naam Oefening</label>
+    <input type="text" id="newExName" placeholder="Bijv. Bulgarian Split Squat">
+    <label>Notities (optioneel)</label>
+    <input type="text" id="newExNotes" placeholder="Tips, cues...">
+    <div class="btn-row" style="margin-top:8px">
+      <button class="btn btn-ghost" onclick="document.getElementById('addExModal').classList.remove('open')">Annuleer</button>
+      <button class="btn btn-gold" onclick="submitNewExercise()">Toevoegen ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div id="toast"></div>
+
+<script>
+  // ================================================================
+  // STATE
+  // ================================================================
+  let routinesData = {};
+  let progressChartInst = null;
+  let bwChartInst = null;
+  let activeMetric = 'max_weight';
+  let timerInterval = null;
+  let timerTotal = 0;
+  let timerLeft = 0;
+
+  // ================================================================
+  // UTILS
+  // ================================================================
+  function toast(msg, duration = 2200) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), duration);
+  }
+
+  function fmt(n, decimals = 1) {
+    if (n == null || isNaN(n)) return '—';
+    const val = parseFloat(n);
+    if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+    if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
+    return val.toFixed(decimals);
+  }
+
+  function setHeaderDate() {
+    const d = new Date();
+    const opts = { weekday: 'long', day: 'numeric', month: 'long' };
+    document.getElementById('headerDate').textContent = d.toLocaleDateString('nl-NL', opts);
+  }
+
+  // ================================================================
+  // TABS
+  // ================================================================
+  function showTab(tab) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('page-' + tab).classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+
+    if (tab === 'dashboard') {
+      loadStats();
+      loadTodayLog();
+      loadProgressChart();
+    }
+    if (tab === 'cardio') loadCardioHistory();
+    if (tab === 'bodyweight') {
+      loadBwChart();
+    }
+  }
+
+  // ================================================================
+  // INIT
+  // ================================================================
+  async function init() {
+    setHeaderDate();
+    await loadRoutines();
+    loadStats();
+    loadTodayLog();
+    loadProgressChart();
+    loadCardioHistory();
+    loadBwChart();
+    populateDashExerciseSelect();
+  }
+
+  async function loadRoutines() {
+    const res = await fetch('/api/routines');
+    routinesData = await res.json();
+
+    const routineSelect = document.getElementById('routineSelect');
+    routineSelect.innerHTML = Object.keys(routinesData)
+      .map(r => `<option value="${r}">${r}</option>`).join('');
+
+    onRoutineChange();
+    populateDashExerciseSelect();
+    populateRoutineDatalist();
+  }
+
+  function populateDashExerciseSelect() {
+    const sel = document.getElementById('dashExerciseSelect');
+    const all = Object.values(routinesData).flat();
+    sel.innerHTML = all.map(e => `<option value="${e.id}">${e.routine} › ${e.name}</option>`).join('');
+  }
+
+  function populateRoutineDatalist() {
+    document.getElementById('routineDatalist').innerHTML =
+      Object.keys(routinesData).map(r => `<option value="${r}">`).join('');
+  }
+
+  // ================================================================
+  // EXERCISE SELECTION
+  // ================================================================
+  function onRoutineChange() {
+    const routine = document.getElementById('routineSelect').value;
+    const exSel = document.getElementById('exerciseSelect');
+    const exercises = routinesData[routine] || [];
+    exSel.innerHTML = exercises.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+    onExerciseChange();
+  }
+
+  async function onExerciseChange() {
+    const exId = document.getElementById('exerciseSelect').value;
+    if (!exId) return;
+
+    // Update media box
+    const routine = document.getElementById('routineSelect').value;
+    const exList = routinesData[routine] || [];
+    const ex = exList.find(e => String(e.id) === String(exId));
+    updateMediaBox(ex);
+
+    // Load previous session
+    await loadPreviousSession(exId);
+
+    // Auto-increment setNr based on today's log for this exercise
+    autoSetNr(exId);
+  }
+
+  function updateMediaBox(ex) {
+    const img = document.getElementById('mediaImg');
+    const placeholder = document.getElementById('mediaPlaceholder');
+    if (ex && ex.media_url) {
+      img.src = ex.media_url;
+      img.style.display = 'block';
+      placeholder.style.display = 'none';
+    } else {
+      img.style.display = 'none';
+      placeholder.style.display = 'flex';
+    }
+    // Store exercise id for upload
+    document.getElementById('mediaFileInput').dataset.exId = ex ? ex.id : '';
+  }
+
+  async function loadPreviousSession(exId) {
+    const res = await fetch(`/api/logs/previous/${exId}`);
+    const data = await res.json();
+    const container = document.getElementById('prevSession');
+    const chips = document.getElementById('prevSetChips');
+
+    if (!data || !data.sets || data.sets.length === 0) {
+      container.style.display = 'none';
+      return;
     }
 
-    function renderExerciseSelect() {
-      const selected = document.getElementById('routineSelect').value;
-      const exSelect = document.getElementById('exerciseSelect');
-      exSelect.innerHTML = routinesData[selected].map(ex => `<option value="${ex.id}">${ex.name}</option>`).join('');
-      loadChart();
+    chips.innerHTML = data.sets.map(s =>
+      `<span class="prev-set-chip" onclick="prefillSet(${s.weight},${s.reps})">
+        Set ${s.set_nr}: <strong>${s.weight}kg × ${s.reps}</strong>
+      </span>`
+    ).join('');
+
+    container.style.display = 'block';
+
+    // Auto-fill with first set of previous session if fields are empty
+    if (data.sets.length > 0) {
+      const w = document.getElementById('weight');
+      const r = document.getElementById('reps');
+      const setNrEl = document.getElementById('setNr');
+      const currentSet = parseInt(setNrEl.value) || 1;
+      const prevSet = data.sets.find(s => s.set_nr === currentSet) || data.sets[0];
+      if (!w.value) w.placeholder = prevSet.weight;
+      if (!r.value) r.placeholder = prevSet.reps;
+    }
+  }
+
+  function prefillSet(weight, reps) {
+    document.getElementById('weight').value = weight;
+    document.getElementById('reps').value = reps;
+  }
+
+  async function autoSetNr(exId) {
+    // Count how many sets have been logged for this exercise today
+    const res = await fetch('/api/logs/today');
+    const logs = await res.json();
+    const setsToday = logs.filter(l => String(l.exercise_id) === String(exId));
+    document.getElementById('setNr').value = setsToday.length + 1;
+  }
+
+  // ================================================================
+  // SUBMIT LOG
+  // ================================================================
+  async function submitLog() {
+    const exId = parseInt(document.getElementById('exerciseSelect').value);
+    const setNr = parseInt(document.getElementById('setNr').value);
+    const weight = parseFloat(document.getElementById('weight').value);
+    const reps = parseInt(document.getElementById('reps').value);
+    const notes = document.getElementById('notes').value;
+
+    if (!weight || !reps) { toast('⚠️ Vul gewicht en reps in!'); return; }
+
+    const res = await fetch('/api/logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exercise_id: exId, set_nr: setNr, weight, reps, notes })
+    });
+    const data = await res.json();
+
+    // Increment set nr
+    document.getElementById('setNr').value = setNr + 1;
+    document.getElementById('weight').value = '';
+    document.getElementById('reps').value = '';
+    document.getElementById('notes').value = '';
+
+    // PR celebration
+    if (data.is_pr) {
+      showPRBanner(`${weight}kg × ${reps} reps`);
+    } else {
+      toast(`✅ Set ${setNr} opgeslagen!`);
     }
 
-    async function submitLog() {
-      const payload = {
-        exercise_id: parseInt(document.getElementById('exerciseSelect').value),
-        set_nr: parseInt(document.getElementById('setNr').value),
-        weight: parseFloat(document.getElementById('weight').value),
-        reps: parseInt(document.getElementById('reps').value),
-        notes: document.getElementById('notes').value
-      };
+    // Start rest timer automatically (90s default)
+    startTimer(90);
 
-      if (!payload.weight || !payload.reps) {
-        alert("Vul gewicht en reps in!");
-        return;
+    // Refresh today log & stats
+    loadTodayLog();
+    loadStats();
+
+    // Update placeholder for next set
+    const nextSet = setNr + 1;
+    const routine = document.getElementById('routineSelect').value;
+    const exList = routinesData[routine] || [];
+    const prevData = await fetch(`/api/logs/previous/${exId}`).then(r => r.json());
+    if (prevData && prevData.sets) {
+      const ps = prevData.sets.find(s => s.set_nr === nextSet);
+      if (ps) {
+        document.getElementById('weight').placeholder = ps.weight;
+        document.getElementById('reps').placeholder = ps.reps;
       }
-
-      await fetch('/api/logs', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-      });
-
-      document.getElementById('msg').innerText = "Opgeslagen!";
-      document.getElementById('setNr').value = payload.set_nr + 1;
-      setTimeout(() => { document.getElementById('msg').innerText = ""; }, 2000);
-      loadChart();
     }
+  }
 
-    async function loadChart() {
-      const exId = document.getElementById('exerciseSelect').value;
-      if (!exId) return;
-      const res = await fetch(`/api/progress/${exId}`);
-      const data = await res.json();
+  // ================================================================
+  // PR BANNER
+  // ================================================================
+  function showPRBanner(text) {
+    const banner = document.getElementById('prBanner');
+    document.getElementById('prBannerSub').textContent = text;
+    banner.classList.add('visible');
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
+    beep(880, 0.3, 0.15);
+    setTimeout(() => beep(1046, 0.3, 0.15), 200);
+    setTimeout(() => banner.classList.remove('visible'), 3500);
+  }
 
-      const labels = data.map(d => d.date);
-      const weights = data.map(d => d.max_weight);
+  // ================================================================
+  // REST TIMER
+  // ================================================================
+  function startTimer(seconds) {
+    if (timerInterval) clearInterval(timerInterval);
+    timerTotal = seconds;
+    timerLeft = seconds;
+    document.getElementById('timerOverlay').classList.add('visible');
+    updateTimerDisplay();
+    timerInterval = setInterval(timerTick, 1000);
+  }
 
-      if (chartInstance) chartInstance.destroy();
-      const ctx = document.getElementById('progressChart').getContext('2d');
-      chartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Max Gewicht (kg)',
-            data: weights,
-            borderColor: '#e63946',
-            backgroundColor: 'rgba(230, 57, 70, 0.2)',
-            fill: true,
-            tension: 0.2
-          }]
+  function timerTick() {
+    timerLeft--;
+    updateTimerDisplay();
+    if (timerLeft <= 0) {
+      stopTimer();
+      timerDone();
+    }
+  }
+
+  function updateTimerDisplay() {
+    const m = Math.floor(timerLeft / 60);
+    const s = timerLeft % 60;
+    const el = document.getElementById('timerDisplay');
+    el.textContent = `${m}:${String(s).padStart(2, '0')}`;
+    el.classList.toggle('urgent', timerLeft <= 10);
+    const pct = timerTotal > 0 ? (timerLeft / timerTotal) * 100 : 100;
+    document.getElementById('timerBar').style.width = pct + '%';
+  }
+
+  function stopTimer() {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    document.getElementById('timerOverlay').classList.remove('visible');
+  }
+
+  function timerDone() {
+    beep(660, 0.5, 0.1);
+    setTimeout(() => beep(880, 0.5, 0.1), 150);
+    setTimeout(() => beep(1046, 0.6, 0.2), 300);
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    toast('⏱️ Rust voorbij! Volgende set!', 3000);
+    setTimeout(stopTimer, 500);
+  }
+
+  // Web Audio API beep (no external files)
+  function beep(freq = 880, vol = 0.3, duration = 0.15) {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(vol, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + duration);
+    } catch(e) {}
+  }
+
+  // ================================================================
+  // MEDIA UPLOAD
+  // ================================================================
+  async function uploadMedia() {
+    const input = document.getElementById('mediaFileInput');
+    const exId = input.dataset.exId;
+    if (!exId || !input.files[0]) return;
+
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+
+    const res = await fetch(`/api/exercises/${exId}/media`, { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (data.media_url) {
+      // Update local state
+      for (const routine of Object.keys(routinesData)) {
+        const ex = routinesData[routine].find(e => String(e.id) === String(exId));
+        if (ex) ex.media_url = data.media_url;
+      }
+      updateMediaBox({ id: exId, media_url: data.media_url });
+      toast('✅ Media geüpload!');
+    }
+  }
+
+  // ================================================================
+  // ADD EXERCISE MODAL
+  // ================================================================
+  function openAddExerciseModal() {
+    document.getElementById('addExModal').classList.add('open');
+    document.getElementById('newRoutine').value = document.getElementById('routineSelect').value;
+    document.getElementById('newExName').focus();
+  }
+
+  function closeModal(e, id) {
+    if (e.target.classList.contains('modal-backdrop') || e.currentTarget === e.target) {
+      document.getElementById(id).classList.remove('open');
+    }
+  }
+
+  async function submitNewExercise() {
+    const routine = document.getElementById('newRoutine').value.trim();
+    const name = document.getElementById('newExName').value.trim();
+    const notes = document.getElementById('newExNotes').value.trim();
+
+    if (!routine || !name) { toast('⚠️ Routine en naam zijn verplicht!'); return; }
+
+    const res = await fetch('/api/exercises', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ routine, name, notes })
+    });
+    const data = await res.json();
+
+    // Update local state
+    if (!routinesData[routine]) routinesData[routine] = [];
+    routinesData[routine].push({ id: data.id, routine, name, media_url: null, notes });
+
+    // Refresh selects
+    const routineSelect = document.getElementById('routineSelect');
+    routineSelect.innerHTML = Object.keys(routinesData)
+      .map(r => `<option value="${r}">${r}</option>`).join('');
+    routineSelect.value = routine;
+    onRoutineChange();
+
+    // Select the new exercise
+    const exSel = document.getElementById('exerciseSelect');
+    exSel.value = data.id;
+    onExerciseChange();
+
+    populateDashExerciseSelect();
+    populateRoutineDatalist();
+
+    document.getElementById('addExModal').classList.remove('open');
+    document.getElementById('newExName').value = '';
+    document.getElementById('newExNotes').value = '';
+    toast(`✅ "${name}" toegevoegd!`);
+  }
+
+  // ================================================================
+  // STATS & DASHBOARD
+  // ================================================================
+  async function loadStats() {
+    const res = await fetch('/api/stats');
+    const data = await res.json();
+
+    document.getElementById('stat-tonnage').textContent = fmt(data.tonnage_today, 0);
+    document.getElementById('stat-sessions').textContent = data.total_sessions;
+    document.getElementById('stat-streak').textContent = data.streak;
+    document.getElementById('stat-volume').textContent = fmt(data.total_volume, 0);
+
+    const wall = document.getElementById('prWall');
+    if (!data.recent_prs || data.recent_prs.length === 0) {
+      wall.innerHTML = '<div class="empty-state"><div class="icon">🦍</div><p>Nog geen PRs. Ga de boel kapotmaken!</p></div>';
+    } else {
+      wall.innerHTML = data.recent_prs.map(pr => `
+        <div class="pr-item">
+          <div class="pr-icon">🏆</div>
+          <div class="pr-details">
+            <div class="pr-exname">${pr.name}</div>
+            <div class="pr-meta">${pr.date} &mdash; <strong style="color:var(--gold-bright)">${pr.weight}kg × ${pr.reps}</strong></div>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+
+  // ================================================================
+  // TODAY LOG
+  // ================================================================
+  async function loadTodayLog() {
+    const res = await fetch('/api/logs/today');
+    const logs = await res.json();
+    const container = document.getElementById('todayLog');
+    if (!logs.length) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">💤</div><p>Nog geen sets gelogd vandaag.</p></div>';
+      return;
+    }
+    container.innerHTML = logs.map(l => `
+      <div class="log-item" id="logitem-${l.id}">
+        <span class="log-badge${l.is_pr ? ' pr-badge' : ''}">Set ${l.set_nr}${l.is_pr ? ' 🔥' : ''}</span>
+        <div class="log-info">
+          <div class="log-ex">${l.exercise_name}</div>
+          <div class="log-weight">${l.weight} kg × ${l.reps} reps</div>
+        </div>
+        <button class="log-del" onclick="deleteLog(${l.id})" title="Verwijder">✕</button>
+      </div>
+    `).join('');
+  }
+
+  async function deleteLog(id) {
+    await fetch(`/api/logs/${id}`, { method: 'DELETE' });
+    document.getElementById('logitem-' + id)?.remove();
+    loadStats();
+    toast('🗑️ Set verwijderd');
+  }
+
+  // ================================================================
+  // PROGRESS CHART
+  // ================================================================
+  function selectMetric(el) {
+    document.querySelectorAll('#chartMetricRow .chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    activeMetric = el.dataset.metric;
+    loadProgressChart();
+  }
+
+  async function loadProgressChart() {
+    const exId = document.getElementById('dashExerciseSelect').value;
+    if (!exId) return;
+
+    const res = await fetch(`/api/progress/${exId}`);
+    const data = await res.json();
+
+    const labels = data.map(d => d.date);
+    const values = data.map(d => d[activeMetric] ? parseFloat(d[activeMetric]).toFixed(1) : null);
+
+    const metricLabel = { max_weight: 'Max Gewicht (kg)', best_e1rm: 'e1RM Epley (kg)', total_volume: 'Volume (kg)' };
+
+    if (progressChartInst) progressChartInst.destroy();
+    const ctx = document.getElementById('progressChart').getContext('2d');
+    progressChartInst = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: metricLabel[activeMetric],
+          data: values,
+          borderColor: '#d4a373',
+          backgroundColor: 'rgba(212,163,115,0.12)',
+          borderWidth: 2.5,
+          fill: true,
+          tension: 0.3,
+          pointBackgroundColor: '#e69500',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#95a597', font: { family: 'Barlow', size: 12 } } }
         },
-        options: {
-          responsive: true,
-          scales: {
-            y: { grid: { color: '#333' } },
-            x: { grid: { color: '#333' } }
+        scales: {
+          y: {
+            grid: { color: 'rgba(45,63,48,0.5)' },
+            ticks: { color: '#95a597', font: { family: 'Barlow' } }
+          },
+          x: {
+            grid: { color: 'rgba(45,63,48,0.3)' },
+            ticks: { color: '#95a597', font: { family: 'Barlow', size: 11 }, maxRotation: 45 }
           }
         }
+      }
+    });
+  }
+
+  // ================================================================
+  // CARDIO
+  // ================================================================
+  async function submitCardio() {
+    const type = document.getElementById('cardioType').value;
+    const dur = parseFloat(document.getElementById('cardioDur').value);
+    const dist = parseFloat(document.getElementById('cardioDist').value) || null;
+    const cal = parseInt(document.getElementById('cardioCal').value) || null;
+
+    if (!dur) { toast('⚠️ Vul de duur in!'); return; }
+
+    await fetch('/api/cardio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, duration_minutes: dur, distance_km: dist, calories: cal })
+    });
+
+    document.getElementById('cardioDur').value = '';
+    document.getElementById('cardioDist').value = '';
+    document.getElementById('cardioCal').value = '';
+    toast('✅ Cardio opgeslagen! 🔥');
+    loadCardioHistory();
+    loadStats();
+  }
+
+  async function loadCardioHistory() {
+    const res = await fetch('/api/cardio');
+    const data = await res.json();
+    const container = document.getElementById('cardioHistory');
+    if (!data.length) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">🏃</div><p>Nog geen cardio gelogd.</p></div>';
+      return;
+    }
+    container.innerHTML = data.map(c => `
+      <div class="cardio-item">
+        <div>
+          <div class="cardio-type">${c.type}</div>
+          <div class="cardio-meta">${c.date}${c.distance_km ? ' · ' + c.distance_km + ' km' : ''}${c.calories ? ' · ' + c.calories + ' kcal' : ''}</div>
+        </div>
+        <div class="cardio-dur">${c.duration_minutes} min</div>
+      </div>
+    `).join('');
+  }
+
+  // ================================================================
+  // BODYWEIGHT
+  // ================================================================
+  async function submitBodyweight() {
+    const kg = parseFloat(document.getElementById('bwKg').value);
+    const fat = parseFloat(document.getElementById('bwFat').value) || null;
+    const muscle = parseFloat(document.getElementById('bwMuscle').value) || null;
+
+    if (!kg) { toast('⚠️ Vul je gewicht in!'); return; }
+
+    await fetch('/api/bodyweight', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weight_kg: kg, body_fat_pct: fat, muscle_mass_kg: muscle })
+    });
+
+    document.getElementById('bwKg').value = '';
+    document.getElementById('bwFat').value = '';
+    document.getElementById('bwMuscle').value = '';
+    toast('✅ Gewicht opgeslagen!');
+    loadBwChart();
+  }
+
+  async function importCSV() {
+    const input = document.getElementById('csvFileInput');
+    if (!input.files[0]) { toast('⚠️ Kies eerst een CSV-bestand.'); return; }
+
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+
+    const res = await fetch('/api/bodyweight/import-csv', { method: 'POST', body: formData });
+    const data = await res.json();
+    document.getElementById('importResult').textContent =
+      `✅ ${data.imported} metingen geïmporteerd, ${data.skipped} overgeslagen.`;
+    loadBwChart();
+  }
+
+  async function loadBwChart() {
+    const res = await fetch('/api/bodyweight');
+    const data = await res.json();
+
+    if (bwChartInst) bwChartInst.destroy();
+    const ctx = document.getElementById('bwChart').getContext('2d');
+
+    const labels = data.map(d => d.date);
+    const weights = data.map(d => d.weight_kg);
+    const fats = data.map(d => d.body_fat_pct);
+
+    const datasets = [{
+      label: 'Gewicht (kg)',
+      data: weights,
+      borderColor: '#d4a373',
+      backgroundColor: 'rgba(212,163,115,0.1)',
+      borderWidth: 2,
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+      yAxisID: 'y',
+    }];
+
+    if (fats.some(f => f != null)) {
+      datasets.push({
+        label: 'Vetpercentage (%)',
+        data: fats,
+        borderColor: '#e63946',
+        backgroundColor: 'rgba(230,57,70,0.05)',
+        borderWidth: 1.5,
+        fill: false,
+        tension: 0.3,
+        pointRadius: 2,
+        yAxisID: 'y2',
       });
     }
 
-    init();
-  </script>
+    bwChartInst = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#95a597', font: { family: 'Barlow', size: 12 } } }
+        },
+        scales: {
+          y: {
+            type: 'linear',
+            position: 'left',
+            grid: { color: 'rgba(45,63,48,0.5)' },
+            ticks: { color: '#95a597', font: { family: 'Barlow' } }
+          },
+          y2: {
+            type: 'linear',
+            position: 'right',
+            grid: { display: false },
+            ticks: { color: '#e63946', font: { family: 'Barlow', size: 11 } }
+          },
+          x: {
+            grid: { color: 'rgba(45,63,48,0.3)' },
+            ticks: { color: '#95a597', font: { family: 'Barlow', size: 10 }, maxRotation: 45, maxTicksLimit: 10 }
+          }
+        }
+      }
+    });
+  }
+
+  // ================================================================
+  // BOOT
+  // ================================================================
+  init();
+</script>
 </body>
 </html>
