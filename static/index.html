@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GorillaStats</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 16px; background: #121212; color: #f0f0f0; }
+    h2, h3 { margin-top: 0; color: #fff; }
+    .card { background: #1e1e1e; padding: 16px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    label { display: block; font-size: 13px; margin-bottom: 4px; color: #aaa; }
+    select, input, button { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #333; background: #2a2a2a; color: #fff; font-size: 16px; box-sizing: border-box; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button { background: #e63946; font-weight: bold; cursor: pointer; border: none; margin-top: 4px; }
+    button:active { background: #b82d38; }
+    #msg { color: #4caf50; font-weight: bold; text-align: center; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <h2>GorillaStats 🦍</h2>
+  <div class="card">
+    <label>Routine</label>
+    <select id="routineSelect" onchange="renderExerciseSelect()"></select>
+
+    <label>Oefening</label>
+    <select id="exerciseSelect" onchange="loadChart()"></select>
+
+    <div class="grid">
+      <div>
+        <label>Set Nr</label>
+        <input type="number" id="setNr" value="1">
+      </div>
+      <div>
+        <label>Reps</label>
+        <input type="number" id="reps" placeholder="8">
+      </div>
+    </div>
+
+    <label>Gewicht (kg)</label>
+    <input type="number" step="0.5" id="weight" placeholder="60.0">
+
+    <label>Notities</label>
+    <input type="text" id="notes" placeholder="RPE 8, goeie vorm">
+
+    <div id="msg"></div>
+    <button onclick="submitLog()">Set Opslaan</button>
+  </div>
+
+  <div class="card">
+    <h3>Progressie</h3>
+    <canvas id="progressChart"></canvas>
+  </div>
+
+  <script>
+    let routinesData = {};
+    let chartInstance = null;
+
+    async function init() {
+      const res = await fetch('/api/routines');
+      routinesData = await res.json();
+      const routineSelect = document.getElementById('routineSelect');
+      routineSelect.innerHTML = Object.keys(routinesData).map(r => `<option value="${r}">${r}</option>`).join('');
+      renderExerciseSelect();
+    }
+
+    function renderExerciseSelect() {
+      const selected = document.getElementById('routineSelect').value;
+      const exSelect = document.getElementById('exerciseSelect');
+      exSelect.innerHTML = routinesData[selected].map(ex => `<option value="${ex.id}">${ex.name}</option>`).join('');
+      loadChart();
+    }
+
+    async function submitLog() {
+      const payload = {
+        exercise_id: parseInt(document.getElementById('exerciseSelect').value),
+        set_nr: parseInt(document.getElementById('setNr').value),
+        weight: parseFloat(document.getElementById('weight').value),
+        reps: parseInt(document.getElementById('reps').value),
+        notes: document.getElementById('notes').value
+      };
+
+      if (!payload.weight || !payload.reps) {
+        alert("Vul gewicht en reps in!");
+        return;
+      }
+
+      await fetch('/api/logs', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+
+      document.getElementById('msg').innerText = "Opgeslagen!";
+      document.getElementById('setNr').value = payload.set_nr + 1;
+      setTimeout(() => { document.getElementById('msg').innerText = ""; }, 2000);
+      loadChart();
+    }
+
+    async function loadChart() {
+      const exId = document.getElementById('exerciseSelect').value;
+      if (!exId) return;
+      const res = await fetch(`/api/progress/${exId}`);
+      const data = await res.json();
+
+      const labels = data.map(d => d.date);
+      const weights = data.map(d => d.max_weight);
+
+      if (chartInstance) chartInstance.destroy();
+      const ctx = document.getElementById('progressChart').getContext('2d');
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Max Gewicht (kg)',
+            data: weights,
+            borderColor: '#e63946',
+            backgroundColor: 'rgba(230, 57, 70, 0.2)',
+            fill: true,
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { grid: { color: '#333' } },
+            x: { grid: { color: '#333' } }
+          }
+        }
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
