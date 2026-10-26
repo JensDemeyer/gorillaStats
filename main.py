@@ -9,6 +9,7 @@ import io
 import os
 import sqlite3
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -20,8 +21,10 @@ from pydantic import BaseModel
 # Config
 # ---------------------------------------------------------------------------
 
-DB_FILE = "gym.db"
-MEDIA_DIR = os.path.join("static", "media")
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+DB_FILE = BASE_DIR / "gym.db"
+MEDIA_DIR = STATIC_DIR / "media"
 os.makedirs(MEDIA_DIR, exist_ok=True)
 
 # ---------------------------------------------------------------------------
@@ -317,6 +320,113 @@ def get_progress(exercise_id: int):
 
 # --- Dashboard stats ---
 
+def get_rewards(conn: sqlite3.Connection, today: date) -> dict:
+    rows = conn.execute(
+        """SELECT date, SUM(sets) AS sets, SUM(minutes) AS minutes, MAX(weighed) AS weighed
+           FROM (
+               SELECT date, COUNT(*) AS sets, 0 AS minutes, 0 AS weighed
+               FROM logs WHERE date <= ? GROUP BY date
+               UNION ALL
+               SELECT date, 0, SUM(duration_minutes), 0
+               FROM cardio_logs WHERE date <= ? GROUP BY date
+               UNION ALL
+               SELECT date, 0, 0, 1 FROM bodyweight_logs WHERE date <= ?
+           ) GROUP BY date ORDER BY date""",
+        (today.isoformat(),) * 3,
+    ).fetchall()
+    days = {}
+    weeks = {}
+    total_xp = 0
+    for row in rows:
+        try:
+            logged = date.fromisoformat(row["date"])
+        except ValueError:
+            continue
+        sets = row["sets"]
+        minutes = max(0, row["minutes"])
+        active = sets >= 3 or minutes >= 10
+        xp = min(sets, 12) * 10 + (40 if sets >= 3 else 0)
+        xp += (30 if minutes >= 10 else 0) + (10 if row["weighed"] else 0)
+        total_xp += xp
+        days[logged] = {"sets": sets, "minutes": minutes, "active": active, "xp": xp}
+        monday = logged - timedelta(days=logged.weekday())
+        weeks[monday] = weeks.get(monday, 0) + int(active)
+
+    monday = today - timedelta(days=today.weekday())
+    week_days = weeks.get(monday, 0)
+    completed_weeks = {week for week, count in weeks.items() if count >= 3}
+    anchor = monday if monday in completed_weeks else monday - timedelta(weeks=1)
+    streak = 0
+    while anchor in completed_weeks:
+        streak += 1
+        anchor -= timedelta(weeks=1)
+    best_streak = 0
+    running = 0
+    previous = None
+    for week in sorted(completed_weeks):
+        running = running + 1 if previous == week - timedelta(weeks=1) else 1
+        best_streak = max(best_streak, running)
+        previous = week
+
+    sessions = sum(day["active"] for day in days.values())
+    total_sets = sum(day["sets"] for day in days.values())
+    cardio_days = sum(day["minutes"] >= 10 for day in days.values())
+    weigh_days = conn.execute(
+        "SELECT COUNT(*) FROM bodyweight_logs WHERE date <= ?", (today.isoformat(),)
+    ).fetchone()[0]
+    variety = conn.execute(
+        """SELECT COUNT(DISTINCT e.routine) FROM logs l JOIN exercises e ON e.id = l.exercise_id
+           WHERE l.date BETWEEN ? AND ?""", (monday.isoformat(), today.isoformat())
+    ).fetchone()[0]
+    milestones = [
+        ("first", "Eerste stap", "1 actieve dag", "flag", sessions, 1, 50),
+        ("ten", "In je ritme", "10 actieve dagen", "flame", sessions, 10, 100),
+        ("fifty", "Vaste waarde", "50 actieve dagen", "medal", sessions, 50, 200),
+        ("hundred", "Honderd keer opdagen", "100 actieve dagen", "crown", sessions, 100, 300),
+        ("sets100", "Stevige basis", "100 sets gelogd", "dumbbell", total_sets, 100, 100),
+        ("sets500", "IJzersterk", "500 sets gelogd", "dumbbell", total_sets, 500, 200),
+        ("sets1500", "Lange adem", "1.500 sets gelogd", "trophy", total_sets, 1500, 300),
+        ("cardio1", "In beweging", "1 dag met 10 minuten cardio", "heart", cardio_days, 1, 50),
+        ("cardio10", "Conditie opgebouwd", "10 cardiodagen", "heart", cardio_days, 10, 150),
+        ("weigh10", "Inzicht telt", "10 wegingen bijgehouden", "chart", weigh_days, 10, 100),
+        ("weeks4", "Vier weken sterk", "4 doelweken op rij", "flame", best_streak, 4, 200),
+        ("weeks12", "Blijver", "12 doelweken op rij", "crown", best_streak, 12, 400),
+    ]
+    achievements = [
+        {"id": key, "title": title, "description": description, "icon": icon,
+         "progress": min(value, target), "target": target, "unlocked": value >= target,
+         "xp": bonus}
+        for key, title, description, icon, value, target, bonus in milestones
+    ]
+    total_xp += sum(item["xp"] for item in achievements if item["unlocked"])
+    level = total_xp // 500 + 1
+    rank = "Starter" if level < 5 else "Doorzetter" if level < 15 else "Krachtpatser" if level < 30 else "Veteraan"
+    current = days.get(today, {"sets": 0, "minutes": 0, "active": False, "xp": 0})
+    calendar = []
+    for offset in range(28):
+        logged = today - timedelta(days=27 - offset)
+        calendar.append({"date": logged.isoformat(), "active": days.get(logged, {}).get("active", False)})
+    return {
+        "xp": total_xp, "level": level, "rank": rank, "level_xp": total_xp % 500,
+        "next_level_xp": 500, "today_xp": current["xp"],
+        "weekly_streak": streak, "best_weekly_streak": best_streak,
+        "weekly_days": week_days, "weekly_target": 3,
+        "week": [{"date": (monday + timedelta(days=offset)).isoformat(),
+                  "active": days.get(monday + timedelta(days=offset), {}).get("active", False),
+                  "today": monday + timedelta(days=offset) == today,
+                  "future": monday + timedelta(days=offset) > today} for offset in range(7)],
+        "calendar": calendar, "achievements": achievements,
+        "quests": [
+            {"title": "Vandaag in beweging", "detail": "3 sets of 10 minuten cardio",
+             "progress": int(current["active"]), "target": 1},
+            {"title": "Je weekdoel", "detail": "3 actieve dagen; rust hoort erbij",
+             "progress": min(week_days, 3), "target": 3},
+            {"title": "Sterk in balans", "detail": "3 verschillende routines deze week",
+             "progress": min(variety, 3), "target": 3},
+        ],
+    }
+
+
 @app.get("/api/stats")
 def get_stats():
     conn = get_conn()
@@ -352,6 +462,7 @@ def get_stats():
     )
     recent_prs = [dict(r) for r in cur.fetchall()]
 
+    rewards = get_rewards(conn, date.today())
     conn.close()
     return {
         "tonnage_today": round(tonnage_today, 1),
@@ -359,6 +470,7 @@ def get_stats():
         "total_sessions": total_sessions,
         "streak": streak,
         "recent_prs": recent_prs,
+        "rewards": rewards,
     }
 
 
@@ -496,9 +608,9 @@ async def upload_media(exercise_id: int, file: UploadFile = File(...)):
 
 # --- Static files & SPA ---
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
 def serve_index():
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")

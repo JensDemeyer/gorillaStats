@@ -562,6 +562,76 @@
     }
     .chip.active { background: rgba(212,163,115,0.15); border-color: var(--gold); color: var(--gold); }
 
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+    .sound-toggle { width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-bright); cursor: pointer; font-size: 1.1rem; }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .journey { padding: 8px 0 20px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+    .journey-heading { display: flex; align-items: center; gap: 14px; }
+    .level-sigil { flex: 0 0 64px; height: 72px; display: grid; place-content: center; text-align: center; background: var(--gold-bright); color: var(--bg-deep); clip-path: polygon(50% 0, 100% 20%, 100% 80%, 50% 100%, 0 80%, 0 20%); }
+    .level-sigil small { font-size: 0.6rem; font-weight: 700; }
+    .level-sigil strong { font: 900 2rem/1 'Barlow Condensed', sans-serif; }
+    .journey-copy { flex: 1; min-width: 0; }
+    .eyebrow { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; }
+    .journey h1 { font: 800 1.8rem/1.1 'Barlow Condensed', sans-serif; margin: 3px 0 7px; overflow-wrap: anywhere; }
+    .xp-caption { display: flex; justify-content: space-between; gap: 8px; font-size: 0.75rem; color: var(--text-dim); margin: 14px 0 7px; }
+    .reward-progress { width: 100%; height: 8px; appearance: none; border: 0; border-radius: 4px; background: var(--bg-card); overflow: hidden; display: block; }
+    .reward-progress::-webkit-progress-bar { background: var(--bg-card); }
+    .reward-progress::-webkit-progress-value { background: var(--gold-bright); transition: width 0.5s ease; }
+    .reward-progress::-moz-progress-bar { background: var(--gold-bright); }
+    .week-summary { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin: 20px 0 12px; }
+    .week-summary strong { font: 700 1.15rem 'Barlow Condensed', sans-serif; color: var(--gold); }
+    .week-summary span { font-size: 0.75rem; color: var(--text-dim); }
+    .week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+    .week-day { text-align: center; color: var(--text-dim); font-size: 0.7rem; }
+    .day-mark { height: 38px; display: grid; place-items: center; margin-top: 5px; border: 1px solid var(--border); border-radius: 8px; font-weight: 700; font-size: 0.9rem; }
+    .week-day.active .day-mark { color: var(--bg-deep); background: #84bf82; border-color: #84bf82; }
+    .week-day.today .day-mark { outline: 2px solid var(--gold); outline-offset: 2px; }
+    .week-day.future { opacity: 0.45; }
+    .reward-section { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+    .reward-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+    .reward-heading h2, .achievement-summary { font: 800 1.15rem 'Barlow Condensed', sans-serif; color: var(--text-bright); }
+    .reward-heading span, .achievement-summary span { font: 500 0.75rem 'Barlow', sans-serif; color: var(--text-dim); }
+    .quest { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid var(--border); }
+    .quest-icon { flex: 0 0 32px; font-size: 1.2rem; text-align: center; }
+    .quest-copy { flex: 1; min-width: 0; }
+    .quest-copy strong { font-size: 0.9rem; display: block; margin-bottom: 3px; }
+    .quest-copy small { color: var(--text-dim); display: block; font-size: 0.75rem; margin-bottom: 8px; }
+    .quest-count { font: 700 1rem 'Barlow Condensed', sans-serif; color: var(--gold); white-space: nowrap; }
+    .quest.complete .reward-progress::-webkit-progress-value { background: #84bf82; }
+    .activity-grid { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 4px; margin-top: 10px; }
+    .activity-cell { aspect-ratio: 1; border-radius: 3px; background: var(--bg-card); border: 1px solid var(--border); }
+    .activity-cell.active { background: #84bf82; border-color: #84bf82; }
+    .activity-key { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-dim); margin-top: 7px; }
+    .achievement-summary { cursor: pointer; padding: 2px 0 14px; }
+    .achievement-summary span { margin-left: 8px; }
+    .achievement-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .achievement { padding: 14px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card2); min-width: 0; }
+    .achievement.unlocked { border-color: #688c59; background: linear-gradient(145deg, #233421, var(--bg-card2)); }
+    .achievement-icon { font-size: 1.6rem; display: block; margin-bottom: 8px; }
+    .achievement.locked .achievement-icon { filter: grayscale(1); opacity: 0.5; }
+    .achievement strong { display: block; font: 700 1rem 'Barlow Condensed', sans-serif; overflow-wrap: anywhere; }
+    .achievement p { color: var(--text-dim); font-size: 0.72rem; min-height: 2.6em; margin: 5px 0 9px; }
+    .achievement-meta { display: flex; justify-content: space-between; gap: 5px; margin-top: 7px; font-size: 0.67rem; color: var(--gold); }
+    .reward-dialog { margin: auto auto 0; width: min(100%, 600px); max-height: 85dvh; overflow-y: auto; padding: 30px 24px max(24px, env(safe-area-inset-bottom)); border: 1px solid var(--gold); border-radius: 16px 16px 0 0; background: var(--bg-base); color: var(--text-bright); text-align: center; }
+    .reward-dialog::backdrop { background: rgba(0,0,0,0.72); }
+    .reward-emblem { font-size: 3.5rem; display: block; margin-bottom: 12px; animation: reward-pop 0.45s ease both; }
+    .reward-dialog h2 { font: 900 2rem 'Barlow Condensed', sans-serif; color: var(--gold-bright); overflow-wrap: anywhere; }
+    .reward-dialog p { font-size: 0.9rem; color: var(--text-dim); margin: 10px 0 16px; line-height: 1.5; }
+    .reward-xp { font: 800 1.6rem 'Barlow Condensed', sans-serif; color: #84bf82; margin-bottom: 22px; }
+    .xp-flash { animation: xp-flash 0.65s ease; }
+    #toast { white-space: normal; width: max-content; max-width: calc(100vw - 32px); text-align: center; }
+    @media (max-width: 480px) {
+      .logo { white-space: nowrap; }
+      #headerDate { display: none; }
+      nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .tab-btn { padding: 12px 2px; font-size: 0.75rem; letter-spacing: 0; }
+    }
+    @keyframes reward-pop { from { opacity: 0; transform: scale(0.5) rotate(-12deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+    @keyframes xp-flash { 50% { filter: brightness(1.8); } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+
     /* Scrollbar */
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -574,7 +644,10 @@
 <header>
   <div class="header-top">
     <div class="logo">Gorilla<span>Stats</span> 🦍</div>
-    <div style="font-size:0.75rem;color:var(--text-muted);text-align:right;line-height:1.4;" id="headerDate"></div>
+    <div class="header-actions">
+      <div style="font-size:0.75rem;color:var(--text-muted);text-align:right;line-height:1.4;" id="headerDate"></div>
+      <button class="sound-toggle" id="soundToggle" onclick="toggleSound()" aria-label="Geluid inschakelen" aria-pressed="false" title="Geluid inschakelen">🔇</button>
+    </div>
   </div>
   <nav>
     <button class="tab-btn active" onclick="showTab('dashboard')" id="tab-dashboard">📊 Dashboard</button>
@@ -591,6 +664,37 @@
   ============================================================ -->
   <div class="page active" id="page-dashboard">
 
+    <section class="journey" aria-label="Jouw voortgang">
+      <div class="journey-heading">
+        <div class="level-sigil"><small>LEVEL</small><strong id="rewardLevel">1</strong></div>
+        <div class="journey-copy">
+          <div class="eyebrow">Elke training telt</div>
+          <h1 id="rewardRank">Jouw volgende stap</h1>
+          <div class="text-muted" id="rewardTotalXp">0 XP totaal</div>
+        </div>
+      </div>
+      <div class="xp-caption"><span id="rewardLevelCaption">Op weg naar level 2</span><span id="rewardXpCaption">0 / 500 XP</span></div>
+      <progress class="reward-progress" id="rewardXpBar" max="500" value="0" aria-label="Voortgang naar volgend level"></progress>
+      <div class="week-summary"><strong id="rewardStreak">🔥 0 weken op rij</strong><span id="rewardWeekCount">0 / 3 actieve dagen</span></div>
+      <div class="week-days" id="rewardWeek"></div>
+    </section>
+
+    <section class="reward-section" aria-label="Doelen">
+      <div class="reward-heading"><h2>Jouw volgende winst</h2><span id="rewardTodayXp">+0 XP vandaag</span></div>
+      <div id="rewardQuests"></div>
+    </section>
+
+    <section class="reward-section" aria-label="Activiteit afgelopen vier weken">
+      <div class="reward-heading"><h2>Je bouwt iets op</h2><span>Laatste 28 dagen</span></div>
+      <div class="activity-grid" id="rewardCalendar"></div>
+      <div class="activity-key"><span>4 weken geleden</span><span>Vandaag</span></div>
+    </section>
+
+    <details class="reward-section" open>
+      <summary class="achievement-summary">Achievements <span id="rewardAchievementCount">0 / 12</span></summary>
+      <div class="achievement-grid" id="rewardAchievements"></div>
+    </details>
+
     <div class="stat-grid">
       <div class="stat-card">
         <div class="stat-val" id="stat-tonnage">—</div>
@@ -602,7 +706,7 @@
       </div>
       <div class="stat-card">
         <div class="stat-val" id="stat-streak">—</div>
-        <div class="stat-label">Streak 🔥</div>
+        <div class="stat-label">Weekstreak 🔥</div>
       </div>
       <div class="stat-card">
         <div class="stat-val" id="stat-volume" style="font-size:1.4rem">—</div>
@@ -700,7 +804,7 @@
         <input type="text" id="notes" placeholder="RPE 8, goeie set...">
       </div>
 
-      <button class="btn btn-primary" onclick="submitLog()">💪 SET OPSLAAN</button>
+      <button class="btn btn-primary" id="saveSetButton" onclick="submitLog()">💪 SET OPSLAAN</button>
 
       <div style="margin-top:12px">
         <button class="btn btn-ghost btn-sm" onclick="openAddExerciseModal()">+ Oefening Toevoegen</button>
@@ -754,7 +858,7 @@
         <input type="number" id="cardioCal" placeholder="200" inputmode="numeric">
       </div>
 
-      <button class="btn btn-gold" onclick="submitCardio()">🔥 CARDIO OPSLAAN</button>
+      <button class="btn btn-gold" id="saveCardioButton" onclick="submitCardio()">🔥 CARDIO OPSLAAN</button>
     </div>
 
     <!-- Cardio history -->
@@ -790,7 +894,7 @@
         <input type="number" step="0.1" id="bwMuscle" placeholder="40.0" inputmode="decimal">
       </div>
 
-      <button class="btn btn-gold" onclick="submitBodyweight()">💾 OPSLAAN</button>
+      <button class="btn btn-gold" id="saveWeightButton" onclick="submitBodyweight()">💾 OPSLAAN</button>
     </div>
 
     <!-- Fitdays CSV import -->
@@ -856,7 +960,16 @@
 </div>
 
 <!-- ===== TOAST ===== -->
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<dialog class="reward-dialog" id="rewardDialog" aria-labelledby="rewardTitle" aria-describedby="rewardDescription">
+  <span class="reward-emblem" id="rewardEmblem" aria-hidden="true">🏆</span>
+  <div class="eyebrow">Een stap verder</div>
+  <h2 id="rewardTitle">Goed bezig!</h2>
+  <p id="rewardDescription"></p>
+  <div class="reward-xp" id="rewardEarnedXp"></div>
+  <button class="btn btn-gold" onclick="document.getElementById('rewardDialog').close()">Mooi, verder!</button>
+</dialog>
 
 <script>
   // ================================================================
@@ -869,6 +982,89 @@
   let timerInterval = null;
   let timerTotal = 0;
   let timerLeft = 0;
+  let lastRewards = null;
+  let statsRequest = 0;
+  let soundEnabled = false;
+  try { soundEnabled = localStorage.getItem('gorilla-sound') === 'on'; } catch (error) {}
+  const rewardIcons = { flag: '🚩', flame: '🔥', medal: '🏅', crown: '👑', dumbbell: '💪', trophy: '🏆', heart: '❤️', chart: '📈' };
+
+  function updateSoundButton() {
+    const button = document.getElementById('soundToggle');
+    button.textContent = soundEnabled ? '🔊' : '🔇';
+    button.setAttribute('aria-pressed', String(soundEnabled));
+    const label = soundEnabled ? 'Geluid uitschakelen' : 'Geluid inschakelen';
+    button.setAttribute('aria-label', label);
+    button.title = label;
+  }
+
+  function toggleSound() {
+    soundEnabled = !soundEnabled;
+    try { localStorage.setItem('gorilla-sound', soundEnabled ? 'on' : 'off'); } catch (error) {}
+    updateSoundButton();
+    if (soundEnabled) beep(660, 0.15, 0.1);
+  }
+
+  function renderRewards(rewards, celebrate) {
+    document.getElementById('rewardLevel').textContent = rewards.level;
+    document.getElementById('rewardRank').textContent = rewards.rank;
+    document.getElementById('rewardTotalXp').textContent = `${rewards.xp.toLocaleString('nl-NL')} XP totaal`;
+    document.getElementById('rewardLevelCaption').textContent = `Op weg naar level ${rewards.level + 1}`;
+    document.getElementById('rewardXpCaption').textContent = `${rewards.level_xp} / ${rewards.next_level_xp} XP`;
+    document.getElementById('rewardXpBar').value = rewards.level_xp;
+    document.getElementById('rewardXpBar').max = rewards.next_level_xp;
+    document.getElementById('rewardStreak').textContent = `🔥 ${rewards.weekly_streak} ${rewards.weekly_streak === 1 ? 'week' : 'weken'} op rij`;
+    document.getElementById('rewardWeekCount').textContent = `${rewards.weekly_days} / ${rewards.weekly_target} actieve dagen`;
+    document.getElementById('rewardTodayXp').textContent = `+${rewards.today_xp} XP vandaag`;
+    const weekLabels = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'];
+    document.getElementById('rewardWeek').innerHTML = rewards.week.map((day, index) => `
+      <div class="week-day${day.active ? ' active' : ''}${day.today ? ' today' : ''}${day.future ? ' future' : ''}" aria-label="${weekLabels[index]} ${day.date}${day.active ? ', actief' : ''}${day.today ? ', vandaag' : ''}">
+        ${weekLabels[index]}<span class="day-mark" aria-hidden="true">${day.active ? '✓' : day.date.slice(8)}</span>
+      </div>`).join('');
+    document.getElementById('rewardQuests').innerHTML = rewards.quests.map(quest => `
+      <div class="quest${quest.progress >= quest.target ? ' complete' : ''}">
+        <span class="quest-icon" aria-hidden="true">${quest.progress >= quest.target ? '✅' : '🎯'}</span>
+        <div class="quest-copy"><strong>${quest.title}</strong><small>${quest.detail}</small>
+          <progress class="reward-progress" value="${quest.progress}" max="${quest.target}" aria-label="${quest.title}"></progress>
+        </div><span class="quest-count">${quest.progress}/${quest.target}</span>
+      </div>`).join('');
+    document.getElementById('rewardCalendar').innerHTML = rewards.calendar.map(day => `
+      <span class="activity-cell${day.active ? ' active' : ''}" role="img" aria-label="${day.date}: ${day.active ? 'actief' : 'rustdag'}" title="${day.date}: ${day.active ? 'actief' : 'rustdag'}"></span>`).join('');
+    const unlocked = rewards.achievements.filter(item => item.unlocked);
+    document.getElementById('rewardAchievementCount').textContent = `${unlocked.length} / ${rewards.achievements.length} behaald`;
+    document.getElementById('rewardAchievements').innerHTML = rewards.achievements.map(item => `
+      <article class="achievement ${item.unlocked ? 'unlocked' : 'locked'}" aria-label="${item.title}: ${item.unlocked ? 'behaald' : 'nog niet behaald'}">
+        <span class="achievement-icon" aria-hidden="true">${rewardIcons[item.icon]}</span>
+        <strong>${item.title}</strong><p>${item.description}</p>
+        <progress class="reward-progress" value="${item.progress}" max="${item.target}" aria-label="${item.title}"></progress>
+        <div class="achievement-meta"><span>${item.unlocked ? '✓ Behaald' : `${item.progress}/${item.target}`}</span><span>+${item.xp} XP</span></div>
+      </article>`).join('');
+    if (celebrate && lastRewards) {
+      const gained = Math.max(0, rewards.xp - lastRewards.xp);
+      const newAchievements = unlocked.filter(item => !lastRewards.achievements.some(old => old.id === item.id && old.unlocked));
+      const leveled = rewards.level > lastRewards.level;
+      const weekComplete = rewards.weekly_days >= 3 && lastRewards.weekly_days < 3;
+      if (newAchievements.length || leveled || weekComplete) {
+        document.getElementById('rewardEmblem').textContent = leveled ? '⚡' : newAchievements.length ? rewardIcons[newAchievements[0].icon] : '🔥';
+        document.getElementById('rewardTitle').textContent = leveled ? `Level ${rewards.level}!` : newAchievements.length ? newAchievements[0].title : 'Weekdoel behaald!';
+        document.getElementById('rewardDescription').textContent = newAchievements.length
+          ? `Nieuw behaald: ${newAchievements.map(item => item.title).join(', ')}.`
+          : leveled ? `${rewards.rank}. Je blijft vooruitgaan.` : 'Drie actieve dagen. Je hebt je ritme gevonden.';
+        document.getElementById('rewardEarnedXp').textContent = `+${gained} XP`;
+        const dialog = document.getElementById('rewardDialog');
+        if (!dialog.open) dialog.showModal();
+        beep(660, 0.2, 0.1);
+        setTimeout(() => beep(880, 0.2, 0.15), 120);
+      } else if (gained > 0) {
+        toast(`Opgeslagen · +${gained} XP`);
+      }
+      if (gained > 0) {
+        const bar = document.getElementById('rewardXpBar');
+        bar.classList.remove('xp-flash');
+        requestAnimationFrame(() => bar.classList.add('xp-flash'));
+      }
+    }
+    lastRewards = rewards;
+  }
 
   // ================================================================
   // UTILS
@@ -919,6 +1115,7 @@
   // ================================================================
   async function init() {
     setHeaderDate();
+    updateSoundButton();
     await loadRoutines();
     loadStats();
     loadTodayLog();
@@ -1043,6 +1240,8 @@
   // SUBMIT LOG
   // ================================================================
   async function submitLog() {
+    const button = document.getElementById('saveSetButton');
+    if (button.disabled) return;
     const exId = parseInt(document.getElementById('exerciseSelect').value);
     const setNr = parseInt(document.getElementById('setNr').value);
     const weight = parseFloat(document.getElementById('weight').value);
@@ -1051,11 +1250,14 @@
 
     if (!weight || !reps) { toast('⚠️ Vul gewicht en reps in!'); return; }
 
+    button.disabled = true;
+    try {
     const res = await fetch('/api/logs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ exercise_id: exId, set_nr: setNr, weight, reps, notes })
     });
+    if (!res.ok) throw new Error('Set opslaan mislukt. Probeer opnieuw.');
     const data = await res.json();
 
     // Increment set nr
@@ -1076,7 +1278,7 @@
 
     // Refresh today log & stats
     loadTodayLog();
-    loadStats();
+    await loadStats(true);
 
     // Update placeholder for next set
     const nextSet = setNr + 1;
@@ -1089,6 +1291,11 @@
         document.getElementById('weight').placeholder = ps.weight;
         document.getElementById('reps').placeholder = ps.reps;
       }
+    }
+    } catch (error) {
+      toast(error.message || 'Geen verbinding. Probeer opnieuw.');
+    } finally {
+      button.disabled = false;
     }
   }
 
@@ -1153,6 +1360,7 @@
 
   // Web Audio API beep (no external files)
   function beep(freq = 880, vol = 0.3, duration = 0.15) {
+    if (!soundEnabled) return;
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const osc = ctx.createOscillator();
@@ -1165,6 +1373,7 @@
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + duration);
+      osc.onended = () => ctx.close();
     } catch(e) {}
   }
 
@@ -1250,14 +1459,19 @@
   // ================================================================
   // STATS & DASHBOARD
   // ================================================================
-  async function loadStats() {
+  async function loadStats(celebrate = false) {
+    const request = ++statsRequest;
+    try {
     const res = await fetch('/api/stats');
+    if (!res.ok) throw new Error('Voortgang laden mislukt.');
     const data = await res.json();
+    if (request !== statsRequest) return;
 
     document.getElementById('stat-tonnage').textContent = fmt(data.tonnage_today, 0);
     document.getElementById('stat-sessions').textContent = data.total_sessions;
-    document.getElementById('stat-streak').textContent = data.streak;
+    document.getElementById('stat-streak').textContent = data.rewards.weekly_streak;
     document.getElementById('stat-volume').textContent = fmt(data.total_volume, 0);
+    renderRewards(data.rewards, celebrate);
 
     const wall = document.getElementById('prWall');
     if (!data.recent_prs || data.recent_prs.length === 0) {
@@ -1272,6 +1486,9 @@
           </div>
         </div>
       `).join('');
+    }
+    } catch (error) {
+      toast('Voortgang kon niet laden. Je opgeslagen data blijft bewaard.');
     }
   }
 
@@ -1370,6 +1587,8 @@
   // CARDIO
   // ================================================================
   async function submitCardio() {
+    const button = document.getElementById('saveCardioButton');
+    if (button.disabled) return;
     const type = document.getElementById('cardioType').value;
     const dur = parseFloat(document.getElementById('cardioDur').value);
     const dist = parseFloat(document.getElementById('cardioDist').value) || null;
@@ -1377,18 +1596,26 @@
 
     if (!dur) { toast('⚠️ Vul de duur in!'); return; }
 
-    await fetch('/api/cardio', {
+    button.disabled = true;
+    try {
+    const response = await fetch('/api/cardio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, duration_minutes: dur, distance_km: dist, calories: cal })
     });
+    if (!response.ok) throw new Error('Cardio opslaan mislukt. Probeer opnieuw.');
 
     document.getElementById('cardioDur').value = '';
     document.getElementById('cardioDist').value = '';
     document.getElementById('cardioCal').value = '';
     toast('✅ Cardio opgeslagen! 🔥');
     loadCardioHistory();
-    loadStats();
+    await loadStats(true);
+    } catch (error) {
+      toast(error.message || 'Geen verbinding. Probeer opnieuw.');
+    } finally {
+      button.disabled = false;
+    }
   }
 
   async function loadCardioHistory() {
@@ -1414,23 +1641,34 @@
   // BODYWEIGHT
   // ================================================================
   async function submitBodyweight() {
+    const button = document.getElementById('saveWeightButton');
+    if (button.disabled) return;
     const kg = parseFloat(document.getElementById('bwKg').value);
     const fat = parseFloat(document.getElementById('bwFat').value) || null;
     const muscle = parseFloat(document.getElementById('bwMuscle').value) || null;
 
     if (!kg) { toast('⚠️ Vul je gewicht in!'); return; }
 
-    await fetch('/api/bodyweight', {
+    button.disabled = true;
+    try {
+    const response = await fetch('/api/bodyweight', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ weight_kg: kg, body_fat_pct: fat, muscle_mass_kg: muscle })
     });
+    if (!response.ok) throw new Error('Gewicht opslaan mislukt. Probeer opnieuw.');
 
     document.getElementById('bwKg').value = '';
     document.getElementById('bwFat').value = '';
     document.getElementById('bwMuscle').value = '';
     toast('✅ Gewicht opgeslagen!');
     loadBwChart();
+    await loadStats(true);
+    } catch (error) {
+      toast(error.message || 'Geen verbinding. Probeer opnieuw.');
+    } finally {
+      button.disabled = false;
+    }
   }
 
   async function importCSV() {
@@ -1445,6 +1683,7 @@
     document.getElementById('importResult').textContent =
       `✅ ${data.imported} metingen geïmporteerd, ${data.skipped} overgeslagen.`;
     loadBwChart();
+    await loadStats(true);
   }
 
   async function loadBwChart() {
