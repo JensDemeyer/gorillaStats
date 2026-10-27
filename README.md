@@ -35,6 +35,20 @@ bijgewerkt voor optionele setgegevens. Bestaande logs blijven behouden.
 De backend gebruikt FastAPI en SQLite zonder ORM. De frontend bestaat uit een
 HTML-bestand met CSS en JavaScript, zonder buildstap.
 
+## Fitdays CSV
+
+De knop **CSV importeren** opent de bestandskiezer en uploadt het gekozen
+bestand direct. De import ondersteunt puntkomma's, komma's en tabs als
+scheidingsteken, decimale komma's, Fitdays-datums zoals `17:36 Jan.27,2025`
+en eenheden zoals `kg`, `%` en `kcal`. `- -` blijft een ontbrekende waarde.
+Fouten en overgeslagen rijen worden bij de knop getoond.
+
+Alle numerieke meetkolommen blijven bewaard en zijn via **Meetwaarde** als
+grafiek te kiezen. Een ontbrekende meting wordt niet als nul getekend.
+Er blijft een meting per datum: bij meerdere rijen op dezelfde dag wordt de
+laatste CSV-rij gebruikt. Dezelfde dag opnieuw importeren werkt de meting bij,
+zonder een dubbele meetdag. Deze import gebruikt alleen de Python-standaardbibliotheek.
+
 ## Een Training Achteraf Registreren
 
 Kies in het trainingslog **Training toevoegen**, selecteer de trainingsdatum

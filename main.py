@@ -6,9 +6,12 @@ Pure sqlite3, no heavy ORM.
 
 import csv
 import io
+import json
+import math
 import os
+import re
 import sqlite3
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -103,6 +106,8 @@ def init_db():
         cur.execute("ALTER TABLE logs_optional RENAME TO logs")
     if "is_estimated" not in {row["name"] for row in cur.execute("PRAGMA table_info(logs)")}:
         cur.execute("ALTER TABLE logs ADD COLUMN is_estimated INTEGER NOT NULL DEFAULT 0")
+    if "metrics_json" not in {row["name"] for row in cur.execute("PRAGMA table_info(bodyweight_logs)")}:
+        cur.execute("ALTER TABLE bodyweight_logs ADD COLUMN metrics_json TEXT NOT NULL DEFAULT '{}'")
 
     # Seed default exercises once
     cur.execute("SELECT COUNT(*) FROM exercises")
@@ -795,63 +800,166 @@ def save_bodyweight(entry: BodyweightEntry):
 def get_bodyweight(limit: int = 90):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM bodyweight_logs ORDER BY date ASC LIMIT ?", (limit,))
+    cur.execute("SELECT * FROM (SELECT * FROM bodyweight_logs ORDER BY date DESC LIMIT ?) ORDER BY date ASC", (max(1, min(limit, 5000)),))
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
+    for row in rows:
+        row["metrics"] = json.loads(row.pop("metrics_json"))
+        for key in ("weight_kg", "body_fat_pct", "muscle_mass_kg"):
+            row["metrics"][key] = {"label": FITDAYS_METRICS[key][0], "unit": FITDAYS_METRICS[key][1], "value": row[key]}
     return rows
+
+
+FITDAYS_METRICS = {
+    "weight_kg": ("Gewicht", "kg", ("Weight", "Weight(kg)", "weight_kg", "Gewicht", "Gewicht(kg)", "体重", "体重(kg)")),
+    "bmi": ("BMI", "", ("BMI",)),
+    "body_fat_pct": ("Vetpercentage", "%", ("Body Fat", "Body Fat(%)", "body_fat_pct", "Vetpercentage", "体脂率", "体脂率(%)")),
+    "subcutaneous_fat_pct": ("Onderhuids vet", "%", ("Subcutaneous fat", "Subcutaneous fat(%)", "Onderhuids vet")),
+    "heart_rate": ("Hartslag", "bpm", ("Heart Rate", "Heart Rate(bpm)", "Hartslag")),
+    "cardiac_index": ("Cardiale index", "L/min/m²", ("Cardiac Index",)),
+    "visceral_fat": ("Visceraal vet", "", ("Visceral Fat", "Visceraal vet")),
+    "body_water_pct": ("Lichaamswater", "%", ("Body Water", "Body Water(%)", "Lichaamswater")),
+    "skeletal_muscle_pct": ("Skeletspieren", "%", ("Skeletal Muscle", "Skeletal Muscle(%)", "Skeletspieren")),
+    "muscle_mass_kg": ("Spiermassa", "kg", ("Muscle Mass", "Muscle Mass(kg)", "muscle_mass_kg", "Spiermassa", "Spiermassa(kg)")),
+    "bone_mass_kg": ("Botmassa", "kg", ("Bone Mass", "Bone Mass(kg)", "Botmassa")),
+    "protein_pct": ("Eiwitpercentage", "%", ("Protein", "Protein(%)", "Eiwitpercentage")),
+    "bmr": ("Basaal metabolisme", "kcal", ("BMR", "BMR(kcal)")),
+    "body_age": ("Lichaamsleeftijd", "jaar", ("Body age", "Body Age(years)", "Lichaamsleeftijd")),
+}
+
+
+def fitdays_header(value):
+    return re.sub(r"[\W_]+", "", str(value).strip().casefold())
+
+
+def fitdays_number(value):
+    raw = str(value).strip()
+    if raw.casefold() in ("", "-", "--", "- -", "n/a", "na", "null", "none"):
+        return None
+    match = re.fullmatch(r"([+-]?\d+(?:[.,]\d+)?)\s*(?:kg|%|kcal|bpm|years?|jaar|L/min/m²)?", raw, re.IGNORECASE)
+    if not match:
+        raise ValueError(f"Ongeldige meetwaarde: {raw[:40]}")
+    number = float(match[1].replace(",", "."))
+    if not math.isfinite(number) or number < 0:
+        raise ValueError("Een meetwaarde moet een positief getal zijn.")
+    return number
+
+
+def fitdays_date(value):
+    raw = str(value).strip()
+    try:
+        return datetime.fromisoformat(raw.replace("/", "-")).date().isoformat()
+    except ValueError:
+        pass
+    match = re.fullmatch(r"(?:\d{1,2}:\d{2}(?::\d{2})?\s+)?([A-Za-z]+)\.?\s*(\d{1,2}),\s*(\d{4})", raw)
+    if match:
+        months = {name: index for index, name in enumerate(
+            ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), start=1)}
+        month = months.get(match[1][:3].casefold())
+        if month:
+            return date(int(match[3]), month, int(match[2])).isoformat()
+    for pattern in ("%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%d/%m/%Y %H:%M", "%d-%m-%Y %H:%M"):
+        try:
+            return datetime.strptime(raw, pattern).date().isoformat()
+        except ValueError:
+            pass
+    raise ValueError(f"Onbekend datumformaat: {raw[:40]}")
+
+
+def iter_fitdays_rows(content: bytes):
+    if content.startswith(b"PK"):
+        raise ValueError("Dit bestand is geen tekst-CSV. Exporteer of bewaar het als CSV.")
+    encoding = "utf-16" if content.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig"
+    try:
+        text = content.decode(encoding)
+    except UnicodeDecodeError:
+        text = content.decode("cp1252")
+    first_line = next((line for line in text.splitlines() if line.strip()), "")
+    try:
+        dialect = csv.Sniffer().sniff(first_line, delimiters=",;\t")
+    except csv.Error:
+        dialect = csv.excel
+    for index, row in enumerate(csv.reader(io.StringIO(text), dialect)):
+        if index >= 20000:
+            raise ValueError("Maximaal 20.000 rijen per bestand. Exporteer een kortere periode.")
+        if any(cell.strip() for cell in row):
+            yield row
+
+
+def parse_fitdays_csv(content: bytes):
+    aliases = {fitdays_header(alias): key for key, (_, _, names) in FITDAYS_METRICS.items() for alias in names}
+    rows = iter_fitdays_rows(content)
+    headers = next(rows, [])
+    normalized = [fitdays_header(header) for header in headers]
+    date_headers = {fitdays_header(name) for name in ("Date", "Datum", "日期")}
+    date_column = next((index for index, header in enumerate(normalized) if header in date_headers), None)
+    if date_column is None or not any(aliases.get(header) == "weight_kg" for header in normalized):
+        raise ValueError("CSV-kolommen Date/Datum en Weight/Gewicht ontbreken. Kies een Fitdays-export.")
+    measurements = {}
+    skipped = 0
+    warnings = []
+    for row_number, values in enumerate(rows, start=2):
+        try:
+            if len(values) != len(headers):
+                raise ValueError("Aantal kolommen klopt niet met de kopregel.")
+            measured_date = fitdays_date(values[date_column])
+            metrics = {}
+            for index, header in enumerate(normalized):
+                if index == date_column:
+                    continue
+                key = aliases.get(header, header)
+                label, unit = FITDAYS_METRICS[key][:2] if key in FITDAYS_METRICS else (headers[index].strip(), "")
+                try:
+                    number = fitdays_number(values[index])
+                except ValueError as error:
+                    if key == "weight_kg":
+                        raise
+                    number = None
+                    if len(warnings) < 5:
+                        warnings.append(f"Rij {row_number}, {label}: {error}")
+                metrics[key] = {"label": label, "unit": unit, "value": number}
+            if metrics["weight_kg"]["value"] is None or metrics["weight_kg"]["value"] <= 0:
+                raise ValueError("Gewicht ontbreekt of is nul.")
+            measurements[measured_date] = metrics
+        except (ValueError, KeyError) as error:
+            skipped += 1
+            if len(warnings) < 5:
+                warnings.append(f"Rij {row_number}: {error}")
+    if not measurements:
+        raise ValueError("Geen geldige metingen gevonden. " + (warnings[0] if warnings else "Het bestand bevat geen meetrijen."))
+    return measurements, skipped, warnings
 
 
 @app.post("/api/bodyweight/import-csv")
 async def import_fitdays_csv(file: UploadFile = File(...)):
-    """Imports a Fitdays CSV export. Handles various column name formats."""
-    content = await file.read()
-    text = content.decode("utf-8-sig", errors="replace")
-    reader = csv.DictReader(io.StringIO(text))
-
-    inserted = 0
-    skipped = 0
+    content = await file.read(5 * 1024 * 1024 + 1)
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(413, "Maximaal 5 MB per CSV-bestand. Exporteer een kortere periode.")
+    try:
+        measurements, skipped, warnings = parse_fitdays_csv(content)
+    except (ValueError, csv.Error) as error:
+        raise HTTPException(422, str(error)) from error
     conn = get_conn()
-
-    for row in reader:
-        def pick(keys):
-            for k in keys:
-                if k in row and row[k].strip():
-                    return row[k].strip()
-            return None
-
-        raw_date = pick(["Date", "date", "日期"])
-        raw_weight = pick(["Weight(kg)", "weight_kg", "Weight", "体重(kg)", "体重"])
-        raw_fat = pick(["Body Fat(%)", "body_fat_pct", "Body Fat", "体脂率(%)"])
-        raw_muscle = pick(["Muscle Mass(kg)", "muscle_mass_kg", "Skeletal Muscle Mass(kg)"])
-
-        if not raw_date or not raw_weight:
-            skipped += 1
-            continue
-
-        try:
-            entry_date = raw_date.replace("/", "-")
-            weight_kg = float(raw_weight)
-            body_fat = float(raw_fat) if raw_fat else None
-            muscle = float(raw_muscle) if raw_muscle else None
-        except (ValueError, TypeError):
-            skipped += 1
-            continue
-
-        conn.execute(
-            """INSERT INTO bodyweight_logs (date, weight_kg, body_fat_pct, muscle_mass_kg, source)
-               VALUES (?, ?, ?, ?, 'fitdays_csv')
-               ON CONFLICT(date) DO UPDATE SET
-                   weight_kg = excluded.weight_kg,
-                   body_fat_pct = excluded.body_fat_pct,
-                   muscle_mass_kg = excluded.muscle_mass_kg,
-                   source = 'fitdays_csv'""",
-            (entry_date, weight_kg, body_fat, muscle),
-        )
-        inserted += 1
-
-    conn.commit()
-    conn.close()
-    return {"imported": inserted, "skipped": skipped}
+    try:
+        with conn:
+            for measured_date, metrics in measurements.items():
+                existing = conn.execute("SELECT metrics_json FROM bodyweight_logs WHERE date = ?", (measured_date,)).fetchone()
+                merged = json.loads(existing["metrics_json"]) if existing else {}
+                merged.update(metrics)
+                conn.execute(
+                    """INSERT INTO bodyweight_logs (date, weight_kg, body_fat_pct, muscle_mass_kg, source, metrics_json)
+                       VALUES (?, ?, ?, ?, 'fitdays_csv', ?)
+                       ON CONFLICT(date) DO UPDATE SET
+                           weight_kg = excluded.weight_kg,
+                           body_fat_pct = COALESCE(excluded.body_fat_pct, bodyweight_logs.body_fat_pct),
+                           muscle_mass_kg = COALESCE(excluded.muscle_mass_kg, bodyweight_logs.muscle_mass_kg),
+                           source = 'fitdays_csv', metrics_json = excluded.metrics_json""",
+                    (measured_date, metrics["weight_kg"]["value"], metrics.get("body_fat_pct", {}).get("value"),
+                     metrics.get("muscle_mass_kg", {}).get("value"), json.dumps(merged, ensure_ascii=False)),
+                )
+    finally:
+        conn.close()
+    return {"imported": len(measurements), "skipped": skipped, "warnings": warnings}
 
 
 # --- Media upload ---

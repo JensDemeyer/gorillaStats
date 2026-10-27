@@ -988,19 +988,18 @@
 
     <!-- Fitdays CSV import -->
     <div class="card">
-      <div class="card-title">📂 Fitdays CSV Importeren</div>
-      <p class="text-muted" style="margin-bottom:12px">Exporteer je data vanuit de Fitdays app en upload het CSV-bestand hieronder.</p>
-      <div class="file-input-wrap">
-        <input type="file" id="csvFileInput" accept=".csv">
-        <label class="file-input-label" for="csvFileInput">📁 Kies CSV-bestand...</label>
-      </div>
-      <button class="btn btn-ghost" onclick="importCSV()">⬆️ Importeren</button>
-      <div id="importResult" style="margin-top:10px;font-size:0.85rem;color:var(--text-dim)"></div>
+      <div class="card-title">📂 Fitdays</div>
+      <input type="file" id="csvFileInput" accept=".csv,text/csv,text/plain,application/vnd.ms-excel" hidden onchange="importCSV()">
+      <button class="btn btn-ghost" id="importCSVButton" onclick="document.getElementById('csvFileInput').click()">📂 CSV importeren</button>
+      <div id="importResult" role="status" aria-live="polite" style="margin-top:10px;font-size:0.85rem;color:var(--text-dim);overflow-wrap:anywhere"></div>
     </div>
 
     <!-- Weight chart -->
     <div class="card">
-      <div class="card-title">📈 Gewichtsevolutie</div>
+      <div class="card-title">📈 Lichaamsmetingen</div>
+      <label for="bwMetricSelect">Meetwaarde</label>
+      <select id="bwMetricSelect" onchange="renderBwChart()"><option value="weight_kg">Gewicht (kg)</option></select>
+      <div id="bwMetricSummary" class="text-muted" role="status" aria-live="polite" style="margin-bottom:10px"></div>
       <div class="chart-wrap"><canvas id="bwChart"></canvas></div>
     </div>
 
@@ -1118,6 +1117,8 @@
   let routinesData = {};
   let progressChartInst = null;
   let bwChartInst = null;
+  let bodyweightData = [];
+  let bodyweightRequest = 0;
   let activeMetric = 'max_weight';
   let timerInterval = null;
   let timerTotal = 0;
@@ -2200,62 +2201,74 @@
 
   async function importCSV() {
     const input = document.getElementById('csvFileInput');
-    if (!input.files[0]) { toast('⚠️ Kies eerst een CSV-bestand.'); return; }
-
-    const formData = new FormData();
-    formData.append('file', input.files[0]);
-
-    const res = await fetch('/api/bodyweight/import-csv', { method: 'POST', body: formData });
-    const data = await res.json();
-    document.getElementById('importResult').textContent =
-      `✅ ${data.imported} metingen geïmporteerd, ${data.skipped} overgeslagen.`;
-    loadBwChart();
-    await loadStats(true);
+    const button = document.getElementById('importCSVButton');
+    if (!input.files[0] || button.disabled) return;
+    const result = document.getElementById('importResult');
+    const file = input.files[0];
+    button.disabled = true;
+    button.textContent = 'Importeren...';
+    result.textContent = `${file.name} wordt verwerkt...`;
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch('/api/bodyweight/import-csv', { method: 'POST', body: formData });
+      const data = await response.json();
+      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Importeren mislukt. Controleer het CSV-bestand.');
+      result.textContent = `${data.imported} ${data.imported === 1 ? 'meetdag' : 'meetdagen'} geïmporteerd, ${data.skipped} rijen overgeslagen.${data.warnings?.length ? ' ' + data.warnings.join(' ') : ''}`;
+      await loadBwChart();
+      await loadStats(true);
+    } catch (error) {
+      result.textContent = error.message || 'Geen verbinding. Probeer opnieuw.';
+    } finally {
+      input.value = '';
+      button.disabled = false;
+      button.textContent = '📂 CSV importeren';
+    }
   }
 
   async function loadBwChart() {
-    const res = await fetch('/api/bodyweight');
-    const data = await res.json();
+    const request = ++bodyweightRequest;
+    try {
+      const data = await api('/api/bodyweight?limit=5000');
+      if (request !== bodyweightRequest) return;
+      bodyweightData = data;
+      const select = document.getElementById('bwMetricSelect');
+      const selected = select.value;
+      const metrics = new Map([['weight_kg', { label: 'Gewicht', unit: 'kg' }]]);
+      for (const row of data) {
+        for (const [key, metric] of Object.entries(row.metrics || {})) metrics.set(key, metric);
+      }
+      select.innerHTML = [...metrics].map(([key, metric]) => `<option value="${escapeHtml(key)}">${escapeHtml(metric.label)}${metric.unit ? ` (${escapeHtml(metric.unit)})` : ''}</option>`).join('');
+      if (metrics.has(selected)) select.value = selected;
+      renderBwChart();
+    } catch (error) {
+      if (request === bodyweightRequest) document.getElementById('bwMetricSummary').textContent = 'Metingen laden mislukt. Probeer opnieuw.';
+    }
+  }
 
+  function renderBwChart() {
+    const selected = document.getElementById('bwMetricSelect').value;
+    const metric = bodyweightData.map(row => row.metrics?.[selected]).find(Boolean) || { label: 'Gewicht', unit: 'kg' };
+    const values = bodyweightData.map(row => row.metrics?.[selected]?.value ?? (selected === 'weight_kg' ? row.weight_kg : null));
+    const valid = values.flatMap((value, index) => value == null ? [] : [{ value, date: bodyweightData[index].date }]);
+    const summary = document.getElementById('bwMetricSummary');
+    summary.textContent = valid.length
+      ? `${valid.at(-1).value.toLocaleString('nl-NL')} ${metric.unit} · ${valid.at(-1).date} · ${valid.length} ${valid.length === 1 ? 'meting' : 'metingen'}`
+      : 'Geen meetwaarden beschikbaar';
     if (bwChartInst) bwChartInst.destroy();
     const ctx = document.getElementById('bwChart').getContext('2d');
-
-    const labels = data.map(d => d.date);
-    const weights = data.map(d => d.weight_kg);
-    const fats = data.map(d => d.body_fat_pct);
-
-    const datasets = [{
-      label: 'Gewicht (kg)',
-      data: weights,
-      borderColor: '#d4a373',
-      backgroundColor: 'rgba(212,163,115,0.1)',
-      borderWidth: 2,
-      fill: true,
-      tension: 0.3,
-      pointRadius: 3,
-      yAxisID: 'y',
-    }];
-
-    if (fats.some(f => f != null)) {
-      datasets.push({
-        label: 'Vetpercentage (%)',
-        data: fats,
-        borderColor: '#e63946',
-        backgroundColor: 'rgba(230,57,70,0.05)',
-        borderWidth: 1.5,
-        fill: false,
-        tension: 0.3,
-        pointRadius: 2,
-        yAxisID: 'y2',
-      });
-    }
-
     bwChartInst = new Chart(ctx, {
       type: 'line',
-      data: { labels, datasets },
+      data: {
+        labels: bodyweightData.map(row => row.date),
+        datasets: [{ label: `${metric.label}${metric.unit ? ` (${metric.unit})` : ''}`, data: values,
+          borderColor: '#84bf82', backgroundColor: 'rgba(132,191,130,0.08)', borderWidth: 2,
+          fill: true, tension: 0.2, pointRadius: valid.length < 2 ? 5 : 3, spanGaps: false }]
+      },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: false,
         plugins: {
           legend: { labels: { color: '#95a597', font: { family: 'Barlow', size: 12 } } }
         },
@@ -2264,13 +2277,8 @@
             type: 'linear',
             position: 'left',
             grid: { color: 'rgba(45,63,48,0.5)' },
-            ticks: { color: '#95a597', font: { family: 'Barlow' } }
-          },
-          y2: {
-            type: 'linear',
-            position: 'right',
-            grid: { display: false },
-            ticks: { color: '#e63946', font: { family: 'Barlow', size: 11 } }
+            ticks: { color: '#95a597', font: { family: 'Barlow' } },
+            title: { display: Boolean(metric.unit), text: metric.unit, color: '#95a597' }
           },
           x: {
             grid: { color: 'rgba(45,63,48,0.3)' },
