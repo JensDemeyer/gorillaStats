@@ -466,6 +466,14 @@
     .routine-row .icon-button { width: 38px; height: 44px; }
     .log-actions { display: flex; gap: 4px; flex-shrink: 0; }
     .log-actions .icon-button { width: 38px; height: 40px; }
+    .selection-label { display: flex; align-items: center; gap: 10px; text-transform: none; letter-spacing: 0; color: var(--text-bright); font-size: 0.9rem; margin: 12px 0; overflow-wrap: anywhere; }
+    .selection-label input[type="checkbox"] { appearance: auto; width: 20px; height: 20px; margin: 0; flex-shrink: 0; accent-color: var(--gold-bright); }
+    .backfill-exercise { border-bottom: 1px solid var(--border); padding: 4px 0 12px; }
+    .backfill-exercise .input-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .backfill-exercise input[type="number"] { min-width: 0; padding: 10px 8px; }
+    .backfill-exercise small { display: block; color: var(--text-dim); font-size: 0.75rem; margin: 6px 0; }
+    .backfill-exercise label { letter-spacing: 0; }
+    #backfillStatus { margin: 10px 0; font-size: 0.85rem; color: var(--text-dim); }
 
     /* ===== PR WALL ===== */
     .pr-item {
@@ -600,7 +608,33 @@
     .journey-copy { flex: 1; min-width: 0; }
     .eyebrow { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; }
     .journey h1 { font: 800 1.8rem/1.1 'Barlow Condensed', sans-serif; margin: 3px 0 7px; overflow-wrap: anywhere; }
+    .rank-description { color: var(--text-dim); font-size: 0.85rem; line-height: 1.5; margin-top: 12px; }
+    #rewardPhase { letter-spacing: 0; overflow-wrap: anywhere; }
     .xp-caption { display: flex; justify-content: space-between; gap: 8px; font-size: 0.75rem; color: var(--text-dim); margin: 14px 0 7px; }
+    .xp-caption span:first-child { min-width: 0; overflow-wrap: anywhere; }
+    .xp-caption span:last-child { flex-shrink: 0; }
+    .journey-controls { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 12px; }
+    .journey-controls .field { flex: 1; min-width: 0; }
+    .journey-controls label { letter-spacing: 0; }
+    #journeyPhaseSelect { margin-bottom: 0; }
+    .level-roadmap { max-height: min(480px, 60dvh); overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .level-roadmap:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+    .level-phase { padding: 18px 4px 8px; }
+    .level-phase-heading { margin-bottom: 12px; }
+    .level-phase-heading small { display: block; color: var(--gold); font-size: 0.7rem; margin-bottom: 5px; }
+    .level-phase-heading h3 { font: 800 1.15rem 'Barlow Condensed', sans-serif; overflow-wrap: anywhere; }
+    .level-phase-heading p { color: var(--text-dim); font-size: 0.75rem; line-height: 1.5; margin-top: 4px; }
+    .phase-achievement { display: block; color: #84bf82; font-size: 0.75rem; margin-top: 8px; }
+    .level-steps { list-style: none; padding: 0; }
+    .level-step { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; padding: 12px 0; border-top: 1px solid var(--border); }
+    .level-number { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--border-light); border-radius: 50%; color: var(--text-dim); font: 700 1rem 'Barlow Condensed', sans-serif; }
+    .level-step.current .level-number { background: var(--gold-bright); color: var(--bg-deep); border-color: var(--gold-bright); }
+    .level-step.unlocked .level-number { border-color: #84bf82; color: #84bf82; }
+    .level-copy strong { display: block; font: 700 1.1rem 'Barlow Condensed', sans-serif; overflow-wrap: anywhere; }
+    .level-copy p { color: var(--text-dim); font-size: 0.8rem; line-height: 1.5; margin: 5px 0; overflow-wrap: anywhere; }
+    .level-status { color: var(--text-dim); font-size: 0.7rem; }
+    .level-step.current .level-status { color: var(--gold); }
+    .achievement.phase-achievement-badge { border-top: 3px solid var(--gold); }
     .reward-progress { width: 100%; height: 8px; appearance: none; border: 0; border-radius: 4px; background: var(--bg-card); overflow: hidden; display: block; }
     .reward-progress::-webkit-progress-bar { background: var(--bg-card); }
     .reward-progress::-webkit-progress-value { background: var(--gold-bright); transition: width 0.5s ease; }
@@ -698,16 +732,29 @@
       <div class="journey-heading">
         <div class="level-sigil"><small>LEVEL</small><strong id="rewardLevel">1</strong></div>
         <div class="journey-copy">
-          <div class="eyebrow">Elke training telt</div>
+          <div class="eyebrow" id="rewardPhase">Fase 1 · De Wieg van het Regenwoud</div>
           <h1 id="rewardRank">Jouw volgende stap</h1>
           <div class="text-muted" id="rewardTotalXp">0 XP totaal</div>
         </div>
       </div>
+      <p class="rank-description" id="rewardRankDescription"></p>
       <div class="xp-caption"><span id="rewardLevelCaption">Op weg naar level 2</span><span id="rewardXpCaption">0 / 500 XP</span></div>
       <progress class="reward-progress" id="rewardXpBar" max="500" value="0" aria-label="Voortgang naar volgend level"></progress>
       <div class="week-summary"><strong id="rewardStreak">🔥 0 weken op rij</strong><span id="rewardWeekCount">0 / 3 actieve dagen</span></div>
       <div class="week-days" id="rewardWeek"></div>
     </section>
+
+    <details class="reward-section" id="levelJourney" open ontoggle="if (this.open && lastRewards) scrollJourneyToCurrent(false)">
+      <summary class="achievement-summary">Jouw evolutie <span id="journeyLevelCount">25 levels · 5 fases</span></summary>
+      <div class="journey-controls">
+        <div class="field">
+          <label for="journeyPhaseSelect">Fase</label>
+          <select id="journeyPhaseSelect" onchange="scrollJourneyToPhase()"></select>
+        </div>
+        <button class="icon-button" onclick="scrollJourneyToCurrent()" title="Naar mijn level" aria-label="Naar mijn level">◎</button>
+      </div>
+      <div class="level-roadmap" id="levelRoadmap" role="region" aria-label="Alle levels en fases" tabindex="0"></div>
+    </details>
 
     <section class="reward-section" aria-label="Doelen">
       <div class="reward-heading"><h2>Jouw volgende winst</h2><span id="rewardTodayXp">+0 XP vandaag</span></div>
@@ -721,7 +768,7 @@
     </section>
 
     <details class="reward-section" open>
-      <summary class="achievement-summary">Achievements <span id="rewardAchievementCount">0 / 12</span></summary>
+      <summary class="achievement-summary">Achievements <span id="rewardAchievementCount">0 / 17</span></summary>
       <div class="achievement-grid" id="rewardAchievements"></div>
     </details>
 
@@ -772,6 +819,7 @@
       <div class="card-title">📋 Trainingslog</div>
       <label for="logDate">Datum</label>
       <input type="date" id="logDate" onchange="loadTodayLog()">
+      <button class="btn btn-ghost btn-sm" onclick="openBackfillWorkout()">+ Training toevoegen</button>
       <div id="todayLog">
         <div class="empty-state"><div class="icon">💤</div><p>Nog geen sets gelogd vandaag.</p></div>
       </div>
@@ -1004,8 +1052,13 @@
 <dialog class="editor-dialog" id="logEditor" aria-labelledby="logEditorTitle">
   <h2 id="logEditorTitle">Set aanpassen</h2>
   <form onsubmit="saveLogEdit(event)">
+    <label for="editLogDate">Datum</label>
+    <input id="editLogDate" type="date" required>
+    <label for="editLogExercise">Oefening</label>
+    <select id="editLogExercise" required></select>
     <label for="editWeight">Gewicht (kg, optioneel)</label>
-    <input id="editWeight" type="number" min="0" step="0.5" inputmode="decimal">
+    <input id="editWeight" type="number" min="0" step="0.01" inputmode="decimal" oninput="document.getElementById('editEstimated').checked = false">
+    <label class="selection-label"><input id="editEstimated" type="checkbox">Geschat gewicht</label>
     <label for="editReps">Reps (optioneel)</label>
     <input id="editReps" type="number" min="1" inputmode="numeric">
     <label for="editNotes">Notities</label>
@@ -1013,6 +1066,23 @@
     <div class="btn-row">
       <button type="button" class="btn btn-ghost" onclick="document.getElementById('logEditor').close()">Annuleer</button>
       <button class="btn btn-gold" id="saveLogEditButton" type="submit">Opslaan</button>
+    </div>
+  </form>
+</dialog>
+<dialog class="editor-dialog" id="backfillDialog" aria-labelledby="backfillTitle">
+  <h2 id="backfillTitle">Training toevoegen</h2>
+  <form onsubmit="saveBackfillWorkout(event)">
+    <label for="backfillDate">Datum</label>
+    <input id="backfillDate" type="date" required onchange="loadBackfillSuggestions()">
+    <label for="backfillRoutine">Schema</label>
+    <select id="backfillRoutine" onchange="filterBackfillExercises()"></select>
+    <label for="backfillSearch">Oefening zoeken</label>
+    <input id="backfillSearch" type="search" oninput="filterBackfillExercises()">
+    <div id="backfillStatus" role="status" aria-live="polite"></div>
+    <div id="backfillExercises"></div>
+    <div class="btn-row section-gap">
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('backfillDialog').close()">Annuleer</button>
+      <button class="btn btn-gold" id="saveBackfillButton" type="submit" disabled>Opslaan</button>
     </div>
   </form>
 </dialog>
@@ -1062,6 +1132,9 @@
   let editingLogId = null;
   let editingRoutine = '';
   let routineDraft = [];
+  let backfillRequest = 0;
+  let backfillSuggestions = [];
+  const backfillSelection = new Map();
   const exerciseDrafts = new Map();
   const logsById = new Map();
   try { soundEnabled = localStorage.getItem('gorilla-sound') === 'on'; } catch (error) {}
@@ -1086,9 +1159,13 @@
   function renderRewards(rewards, celebrate) {
     document.getElementById('rewardLevel').textContent = rewards.level;
     document.getElementById('rewardRank').textContent = rewards.rank;
+    document.getElementById('rewardPhase').textContent = `Fase ${rewards.phase_number} · ${rewards.phase}`;
+    document.getElementById('rewardRankDescription').textContent = rewards.rank_description;
     document.getElementById('rewardTotalXp').textContent = `${rewards.xp.toLocaleString('nl-NL')} XP totaal`;
-    document.getElementById('rewardLevelCaption').textContent = `Op weg naar level ${rewards.level + 1}`;
-    document.getElementById('rewardXpCaption').textContent = `${rewards.level_xp} / ${rewards.next_level_xp} XP`;
+    const nextRank = rewards.journey.flatMap(phase => phase.levels).find(rank => rank.level === rewards.level + 1);
+    document.getElementById('rewardLevelCaption').textContent = rewards.is_max_level ? 'Hoogste rang bereikt' : `Volgende: ${nextRank.name} · level ${nextRank.level}`;
+    document.getElementById('rewardXpCaption').textContent = rewards.is_max_level ? 'Voltooid' : `${rewards.level_xp} / ${rewards.next_level_xp} XP`;
+    document.getElementById('rewardXpBar').setAttribute('aria-label', rewards.is_max_level ? 'Hoogste rang bereikt' : `Voortgang naar level ${rewards.level + 1}`);
     document.getElementById('rewardXpBar').value = rewards.level_xp;
     document.getElementById('rewardXpBar').max = rewards.next_level_xp;
     document.getElementById('rewardStreak').textContent = `🔥 ${rewards.weekly_streak} ${rewards.weekly_streak === 1 ? 'week' : 'weken'} op rij`;
@@ -1111,12 +1188,13 @@
     const unlocked = rewards.achievements.filter(item => item.unlocked);
     document.getElementById('rewardAchievementCount').textContent = `${unlocked.length} / ${rewards.achievements.length} behaald`;
     document.getElementById('rewardAchievements').innerHTML = rewards.achievements.map(item => `
-      <article class="achievement ${item.unlocked ? 'unlocked' : 'locked'}" aria-label="${item.title}: ${item.unlocked ? 'behaald' : 'nog niet behaald'}">
+      <article class="achievement ${item.unlocked ? 'unlocked' : 'locked'}${item.category === 'phase' ? ' phase-achievement-badge' : ''}" aria-label="${escapeHtml(item.title)}: ${item.unlocked ? 'behaald' : 'nog niet behaald'}">
         <span class="achievement-icon" aria-hidden="true">${rewardIcons[item.icon]}</span>
         <strong>${item.title}</strong><p>${item.description}</p>
         <progress class="reward-progress" value="${item.progress}" max="${item.target}" aria-label="${item.title}"></progress>
-        <div class="achievement-meta"><span>${item.unlocked ? '✓ Behaald' : `${item.progress}/${item.target}`}</span><span>+${item.xp} XP</span></div>
+        <div class="achievement-meta"><span>${item.unlocked ? '✓ Behaald' : `${item.progress}/${item.target}`}</span><span>${item.category === 'phase' ? 'Fasebadge' : `+${item.xp} XP`}</span></div>
       </article>`).join('');
+    renderLevelJourney(rewards);
     if (celebrate && lastRewards) {
       const gained = Math.max(0, rewards.xp - lastRewards.xp);
       const newAchievements = unlocked.filter(item => !lastRewards.achievements.some(old => old.id === item.id && old.unlocked));
@@ -1124,7 +1202,7 @@
       const weekComplete = rewards.weekly_days >= 3 && lastRewards.weekly_days < 3;
       if (newAchievements.length || leveled || weekComplete) {
         document.getElementById('rewardEmblem').textContent = leveled ? '⚡' : newAchievements.length ? rewardIcons[newAchievements[0].icon] : '🔥';
-        document.getElementById('rewardTitle').textContent = leveled ? `Level ${rewards.level}!` : newAchievements.length ? newAchievements[0].title : 'Weekdoel behaald!';
+        document.getElementById('rewardTitle').textContent = leveled ? `Level ${rewards.level}: ${rewards.rank}` : newAchievements.length ? newAchievements[0].title : 'Weekdoel behaald!';
         document.getElementById('rewardDescription').textContent = newAchievements.length
           ? `Nieuw behaald: ${newAchievements.map(item => item.title).join(', ')}.`
           : leveled ? `${rewards.rank}. Je blijft vooruitgaan.` : 'Drie actieve dagen. Je hebt je ritme gevonden.';
@@ -1143,6 +1221,54 @@
       }
     }
     lastRewards = rewards;
+  }
+
+  function renderLevelJourney(rewards) {
+    const roadmap = document.getElementById('levelRoadmap');
+    const previousLevel = roadmap.dataset.level;
+    const previousScroll = roadmap.scrollTop;
+    const phaseSelect = document.getElementById('journeyPhaseSelect');
+    const selectedPhase = phaseSelect.value || String(rewards.phase_number);
+    phaseSelect.innerHTML = rewards.journey.map(phase => `<option value="${phase.number}">Fase ${phase.number} · ${escapeHtml(phase.name)}</option>`).join('');
+    phaseSelect.value = selectedPhase;
+    document.getElementById('journeyLevelCount').textContent = `Level ${rewards.level} / ${rewards.max_level} · ${rewards.journey.length} fases`;
+    roadmap.innerHTML = rewards.journey.map(phase => `
+      <section class="level-phase" id="journey-phase-${phase.number}" aria-labelledby="journey-phase-title-${phase.number}">
+        <div class="level-phase-heading">
+          <small>FASE ${phase.number} · LEVEL ${phase.start_level}–${phase.end_level}</small>
+          <h3 id="journey-phase-title-${phase.number}">${escapeHtml(phase.name)}</h3>
+          <p>${escapeHtml(phase.description)}</p>
+          <span class="phase-achievement">${phase.completed ? '✓ Fase-achievement behaald' : `Fase-achievement bij level ${phase.end_level}`}</span>
+        </div>
+        <ol class="level-steps" start="${phase.start_level}">
+          ${phase.levels.map(rank => `<li class="level-step ${rank.current ? 'current' : rank.unlocked ? 'unlocked' : 'locked'}" id="journey-level-${rank.level}"${rank.current ? ' aria-current="step"' : ''}>
+            <span class="level-number" aria-label="Level ${rank.level}">${rank.level}</span>
+            <div class="level-copy"><strong>${escapeHtml(rank.name)}</strong><p>${escapeHtml(rank.description)}</p>
+              <span class="level-status">${rank.current ? 'Jouw huidige rang' : rank.unlocked ? '✓ Behaald' : `Nog ${(rank.xp_required - rewards.xp).toLocaleString('nl-NL')} XP`} · ${rank.xp_required.toLocaleString('nl-NL')} XP totaal</span>
+            </div>
+          </li>`).join('')}
+        </ol>
+      </section>`).join('');
+    roadmap.dataset.level = rewards.level;
+    if (previousLevel !== String(rewards.level)) requestAnimationFrame(() => scrollJourneyToCurrent(false, rewards));
+    else roadmap.scrollTop = previousScroll;
+  }
+
+  function scrollJourneyToElement(element, smooth) {
+    if (!element) return;
+    const roadmap = document.getElementById('levelRoadmap');
+    const top = element.getBoundingClientRect().top - roadmap.getBoundingClientRect().top + roadmap.scrollTop;
+    roadmap.scrollTo({ top: Math.max(0, top - 8), behavior: smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'instant' });
+  }
+
+  function scrollJourneyToPhase() {
+    scrollJourneyToElement(document.getElementById(`journey-phase-${document.getElementById('journeyPhaseSelect').value}`), true);
+  }
+
+  function scrollJourneyToCurrent(smooth = true, rewards = lastRewards) {
+    if (!rewards) return;
+    document.getElementById('journeyPhaseSelect').value = rewards.phase_number;
+    scrollJourneyToElement(document.getElementById(`journey-level-${rewards.level}`), smooth);
   }
 
   // ================================================================
@@ -1169,7 +1295,7 @@
 
   function setSummary(set) {
     if (set.weight == null && set.reps == null) return 'Nog aan te vullen';
-    return `${set.weight == null ? '? kg' : `${set.weight} kg`} × ${set.reps == null ? '? reps' : `${set.reps} reps`}`;
+    return `${set.weight == null ? '? kg' : `${set.weight} kg`} × ${set.reps == null ? '? reps' : `${set.reps} reps`}${set.is_estimated ? ' · geschat' : ''}`;
   }
 
   async function api(url, options) {
@@ -1212,6 +1338,8 @@
     updateSoundButton();
     const today = new Date();
     document.getElementById('logDate').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    document.getElementById('editLogDate').max = document.getElementById('logDate').value;
+    document.getElementById('backfillDate').max = document.getElementById('logDate').value;
     await loadRoutines();
     loadStats();
     loadTodayLog();
@@ -1731,7 +1859,13 @@
     if (!log) return;
     editingLogId = id;
     document.getElementById('logEditorTitle').textContent = `${log.exercise_name} · set ${log.set_nr} · ${log.date}`;
+    document.getElementById('editLogDate').value = log.date;
+    const exercises = Object.values(routinesData).flat();
+    if (!exercises.some(ex => ex.id === log.exercise_id)) exercises.push({ id: log.exercise_id, name: log.exercise_name, routine: 'Historiek' });
+    document.getElementById('editLogExercise').innerHTML = exercises.map(ex => `<option value="${ex.id}">${escapeHtml(ex.routine)} › ${escapeHtml(ex.name)}</option>`).join('');
+    document.getElementById('editLogExercise').value = log.exercise_id;
     document.getElementById('editWeight').value = log.weight ?? '';
+    document.getElementById('editEstimated').checked = Boolean(log.is_estimated);
     document.getElementById('editReps').value = log.reps ?? '';
     document.getElementById('editNotes').value = log.notes || '';
     document.getElementById('logEditor').showModal();
@@ -1746,12 +1880,16 @@
       await api(`/api/logs/${editingLogId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          log_date: document.getElementById('editLogDate').value,
+          exercise_id: Number(document.getElementById('editLogExercise').value),
+          is_estimated: document.getElementById('editEstimated').checked,
           weight: document.getElementById('editWeight').value === '' ? null : Number(document.getElementById('editWeight').value),
           reps: document.getElementById('editReps').value === '' ? null : Number(document.getElementById('editReps').value),
           notes: document.getElementById('editNotes').value
         })
       });
       document.getElementById('logEditor').close();
+      document.getElementById('logDate').value = document.getElementById('editLogDate').value;
       await loadTodayLog();
       loadStats();
       loadProgressChart();
@@ -1772,6 +1910,143 @@
       loadProgressChart();
       toast('Set verwijderd');
     } catch (error) { toast(error.message); }
+  }
+
+  function openBackfillWorkout() {
+    backfillSelection.clear();
+    document.getElementById('backfillDate').value = document.getElementById('logDate').value;
+    document.getElementById('backfillSearch').value = '';
+    document.getElementById('backfillDialog').showModal();
+    loadBackfillSuggestions();
+  }
+
+  async function loadBackfillSuggestions() {
+    const request = ++backfillRequest;
+    const date = document.getElementById('backfillDate').value;
+    document.getElementById('saveBackfillButton').disabled = true;
+    document.getElementById('backfillExercises').innerHTML = '';
+    document.getElementById('backfillStatus').textContent = 'Gewichten laden...';
+    if (!date) return;
+    try {
+      const suggestions = await api(`/api/workouts/suggestions?log_date=${encodeURIComponent(date)}`);
+      if (request !== backfillRequest) return;
+      backfillSuggestions = suggestions;
+      for (const suggestion of suggestions) {
+        const selected = backfillSelection.get(suggestion.exercise_id);
+        if (selected && selected.is_estimated) selected.weight = suggestion.weight;
+      }
+      const routineSelect = document.getElementById('backfillRoutine');
+      const selectedRoutine = routineSelect.value;
+      routineSelect.innerHTML = '<option value="">Alle schema\'s</option>' + [...new Set(suggestions.map(ex => ex.routine))]
+        .map(routine => `<option value="${escapeHtml(routine)}">${escapeHtml(routine)}</option>`).join('');
+      if ([...routineSelect.options].some(option => option.value === selectedRoutine)) routineSelect.value = selectedRoutine;
+      renderBackfillExercises();
+    } catch (error) {
+      if (request === backfillRequest) document.getElementById('backfillStatus').textContent = error.message;
+    }
+  }
+
+  function renderBackfillExercises() {
+    document.getElementById('backfillExercises').innerHTML = backfillSuggestions.map(ex => {
+      const selected = backfillSelection.get(ex.exercise_id);
+      const values = selected || { sets: Math.min(20, ex.sets), weight: ex.weight, reps: null, is_estimated: ex.weight != null };
+      return `<div class="backfill-exercise" data-exercise-id="${ex.exercise_id}">
+        <label class="selection-label"><input type="checkbox" ${selected ? 'checked' : ''} onchange="toggleBackfillExercise(${ex.exercise_id}, this.checked)">${escapeHtml(ex.name)}${ex.active ? '' : ' (historiek)'}</label>
+        <small>${escapeHtml(ex.routine)}</small>
+        <div ${selected ? '' : 'hidden'} class="backfill-fields">
+          <div class="input-row">
+            <div><label for="backfillSets-${ex.exercise_id}">Sets</label><input id="backfillSets-${ex.exercise_id}" type="number" min="1" max="20" value="${values.sets}" inputmode="numeric" oninput="setBackfillValue(${ex.exercise_id}, 'sets', this.value)"></div>
+            <div><label for="backfillWeight-${ex.exercise_id}">Kg</label><input id="backfillWeight-${ex.exercise_id}" type="number" min="0" step="0.01" value="${values.weight ?? ''}" inputmode="decimal" oninput="setBackfillValue(${ex.exercise_id}, 'weight', this.value)"></div>
+            <div><label for="backfillReps-${ex.exercise_id}">Reps</label><input id="backfillReps-${ex.exercise_id}" type="number" min="1" value="${values.reps ?? ''}" inputmode="numeric" oninput="setBackfillValue(${ex.exercise_id}, 'reps', this.value)"></div>
+          </div>
+          <small>${ex.weight == null ? 'Geen eerder gewicht beschikbaar' : `Gemiddelde van ${ex.sessions} eerdere ${ex.sessions === 1 ? 'sessie' : 'sessies'}: ${ex.weight} kg`}</small>
+          <label class="selection-label"><input id="backfillEstimated-${ex.exercise_id}" type="checkbox" ${values.is_estimated ? 'checked' : ''} ${ex.weight == null ? 'disabled' : ''} onchange="setBackfillEstimated(${ex.exercise_id}, this.checked)">Geschat gewicht</label>
+        </div>
+      </div>`;
+    }).join('');
+    for (const row of document.querySelectorAll('#backfillExercises .backfill-exercise')) {
+      const selected = backfillSelection.has(Number(row.dataset.exerciseId));
+      row.querySelectorAll('input[type="number"]').forEach(input => {
+        input.disabled = !selected;
+        input.required = selected && input.id.startsWith('backfillSets-');
+      });
+    }
+    filterBackfillExercises();
+    updateBackfillStatus();
+  }
+
+  function toggleBackfillExercise(id, checked) {
+    if (checked) {
+      const ex = backfillSuggestions.find(exercise => exercise.exercise_id === id);
+      const row = document.querySelector(`#backfillExercises [data-exercise-id="${id}"]`);
+      backfillSelection.set(id, { exercise_id: id,
+        sets: Number(row.querySelector('[id^="backfillSets-"]').value),
+        weight: row.querySelector('[id^="backfillWeight-"]').value === '' ? null : Number(row.querySelector('[id^="backfillWeight-"]').value),
+        reps: row.querySelector('[id^="backfillReps-"]').value === '' ? null : Number(row.querySelector('[id^="backfillReps-"]').value),
+        is_estimated: ex.weight != null && row.querySelector('[id^="backfillEstimated-"]').checked });
+    } else backfillSelection.delete(id);
+    const row = document.querySelector(`#backfillExercises [data-exercise-id="${id}"]`);
+    row.querySelector('.backfill-fields').hidden = !checked;
+    row.querySelectorAll('input[type="number"]').forEach(input => {
+      input.disabled = !checked;
+      input.required = checked && input.id.startsWith('backfillSets-');
+    });
+    updateBackfillStatus();
+  }
+
+  function setBackfillValue(id, field, value) {
+    const selected = backfillSelection.get(id);
+    if (!selected) return;
+    selected[field] = value === '' ? null : Number(value);
+    if (field === 'weight') {
+      selected.is_estimated = false;
+      document.getElementById(`backfillEstimated-${id}`).checked = false;
+    }
+  }
+
+  function setBackfillEstimated(id, checked) {
+    const selected = backfillSelection.get(id);
+    if (!selected) return;
+    selected.is_estimated = checked;
+    if (checked) {
+      selected.weight = backfillSuggestions.find(ex => ex.exercise_id === id).weight;
+      document.getElementById(`backfillWeight-${id}`).value = selected.weight ?? '';
+    }
+  }
+
+  function filterBackfillExercises() {
+    const routine = document.getElementById('backfillRoutine').value;
+    const search = document.getElementById('backfillSearch').value.trim().toLocaleLowerCase('nl');
+    for (const ex of backfillSuggestions) {
+      const row = document.querySelector(`#backfillExercises [data-exercise-id="${ex.exercise_id}"]`);
+      row.hidden = (routine && ex.routine !== routine) || !ex.name.toLocaleLowerCase('nl').includes(search);
+    }
+  }
+
+  function updateBackfillStatus() {
+    document.getElementById('backfillStatus').textContent = `${backfillSelection.size} oefeningen geselecteerd`;
+    document.getElementById('saveBackfillButton').disabled = backfillSelection.size === 0;
+  }
+
+  async function saveBackfillWorkout(event) {
+    event.preventDefault();
+    const button = document.getElementById('saveBackfillButton');
+    if (button.disabled) return;
+    const date = document.getElementById('backfillDate').value;
+    button.disabled = true;
+    try {
+      const result = await api('/api/workouts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ log_date: date, exercises: [...backfillSelection.values()] })
+      });
+      document.getElementById('backfillDialog').close();
+      document.getElementById('logDate').value = date;
+      await loadTodayLog();
+      loadStats();
+      loadProgressChart();
+      toast(`Training opgeslagen · ${result.sets} sets`);
+    } catch (error) { toast(error.message); }
+    finally { updateBackfillStatus(); }
   }
 
   // ================================================================

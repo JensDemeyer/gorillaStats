@@ -2,7 +2,7 @@ import sqlite3
 import unittest
 from datetime import date, timedelta
 
-from main import get_rewards
+from main import LEVEL_PHASES, get_level_progression, get_rewards
 
 
 class RewardsTests(unittest.TestCase):
@@ -89,6 +89,57 @@ class RewardsTests(unittest.TestCase):
         for exercise_id in (1, 2, 3):
             self.log_day(self.today, exercise_id=exercise_id)
         self.assertEqual(self.rewards()["quests"][2]["progress"], 3)
+
+    def test_all_rank_and_phase_boundaries(self):
+        names = [name for _, _, ranks in LEVEL_PHASES for name, _ in ranks]
+        self.assertEqual(len(names), 25)
+        self.assertEqual(names[0], "Baby Gorillatje")
+        self.assertEqual(names[-1], "Ultra Alfa Gorilla")
+        for level, name in enumerate(names, start=1):
+            with self.subTest(level=level):
+                threshold = (level - 1) * 500
+                result = get_level_progression(threshold)
+                self.assertEqual((result["level"], result["rank"]), (level, name))
+                self.assertEqual(result["phase_number"], (level - 1) // 5 + 1)
+                self.assertEqual(sum(item["unlocked"] for item in result["phase_achievements"]), level // 5)
+                self.assertEqual(sum(rank["current"] for phase in result["journey"] for rank in phase["levels"]), 1)
+                self.assertEqual(result["is_max_level"], level == 25)
+                if level > 1:
+                    self.assertEqual(get_level_progression(threshold - 1)["level"], level - 1)
+
+    def test_journey_previews_all_future_levels(self):
+        result = get_level_progression(0)
+        self.assertEqual(len(result["journey"]), 5)
+        self.assertEqual([phase["end_level"] for phase in result["journey"]], [5, 10, 15, 20, 25])
+        ranks = [rank for phase in result["journey"] for rank in phase["levels"]]
+        self.assertEqual(sum(rank["unlocked"] for rank in ranks), 1)
+        self.assertTrue(all(rank["description"] for rank in ranks))
+        self.assertEqual(ranks[-1]["xp_required"], 12000)
+
+    def test_final_rank_caps_level_but_keeps_total_xp(self):
+        for xp in (12000, 12500, 100000):
+            with self.subTest(xp=xp):
+                result = get_level_progression(xp)
+                self.assertEqual((result["level"], result["rank"]), (25, "Ultra Alfa Gorilla"))
+                self.assertEqual(result["level_xp"], result["next_level_xp"])
+                self.assertTrue(all(item["unlocked"] for item in result["phase_achievements"]))
+
+    def test_phase_badges_do_not_add_xp_and_recalculate(self):
+        for offset in range(14):
+            self.log_day(self.today - timedelta(days=offset), sets=12)
+        result = self.rewards()
+        self.assertEqual((result["xp"], result["level"]), (2490, 5))
+        self.assertEqual(len(result["achievements"]), 17)
+        self.assertEqual(len({item["id"] for item in result["achievements"]}), 17)
+        phases = [item for item in result["achievements"] if item.get("category") == "phase"]
+        self.assertTrue(phases[0]["unlocked"])
+        self.assertFalse(phases[1]["unlocked"])
+        self.assertTrue(all(item["xp"] == 0 for item in phases))
+        self.assertEqual(self.rewards()["xp"], result["xp"])
+        self.conn.execute("DELETE FROM logs")
+        reset = self.rewards()
+        self.assertEqual((reset["level"], reset["rank"]), (1, "Baby Gorillatje"))
+        self.assertFalse(any(item["unlocked"] for item in reset["achievements"]))
 
 
 if __name__ == "__main__":

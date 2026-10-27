@@ -101,6 +101,8 @@ def init_db():
         cur.execute("INSERT INTO logs_optional SELECT id, date, exercise_id, set_nr, weight, reps, is_pr, notes FROM logs")
         cur.execute("DROP TABLE logs")
         cur.execute("ALTER TABLE logs_optional RENAME TO logs")
+    if "is_estimated" not in {row["name"] for row in cur.execute("PRAGMA table_info(logs)")}:
+        cur.execute("ALTER TABLE logs ADD COLUMN is_estimated INTEGER NOT NULL DEFAULT 0")
 
     # Seed default exercises once
     cur.execute("SELECT COUNT(*) FROM exercises")
@@ -154,6 +156,22 @@ class LogUpdate(BaseModel):
     weight: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     reps: Optional[int] = Field(default=None, ge=1)
     notes: Optional[str] = ""
+    exercise_id: Optional[int] = None
+    log_date: Optional[date] = None
+    is_estimated: Optional[bool] = None
+
+
+class WorkoutExercise(BaseModel):
+    exercise_id: int
+    sets: int = Field(default=3, ge=1, le=20)
+    weight: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    reps: Optional[int] = Field(default=None, ge=1)
+    is_estimated: bool = True
+
+
+class WorkoutEntry(BaseModel):
+    log_date: date
+    exercises: list[WorkoutExercise] = Field(min_length=1, max_length=50)
 
 
 class RoutineExercise(BaseModel):
@@ -227,7 +245,7 @@ def refresh_prs(conn: sqlite3.Connection, exercise_id: int):
     best_weight = 0
     best_e1rm = 0
     for row in conn.execute("SELECT * FROM logs WHERE exercise_id = ? ORDER BY date, id", (exercise_id,)).fetchall():
-        complete = row["weight"] is not None and row["reps"] is not None
+        complete = row["weight"] is not None and row["reps"] is not None and not row["is_estimated"]
         estimated = epley_e1rm(row["weight"], row["reps"]) if complete else 0
         is_pr = complete and (row["weight"] > best_weight or estimated > best_e1rm)
         if row["is_pr"] != int(is_pr):
@@ -311,6 +329,66 @@ def update_routine(routine: str, body: RoutineUpdate):
 
 # --- Logs ---
 
+def workout_suggestions(conn: sqlite3.Connection, log_date: date):
+    rows = conn.execute("""
+        WITH sessions AS (
+            SELECT exercise_id, date, AVG(weight) AS weight, COUNT(*) AS sets,
+                   ROW_NUMBER() OVER (PARTITION BY exercise_id ORDER BY date DESC) AS position
+            FROM logs WHERE date < ? AND weight IS NOT NULL AND is_estimated = 0
+            GROUP BY exercise_id, date
+        ), averages AS (
+            SELECT exercise_id, ROUND(AVG(weight), 2) AS weight, COUNT(*) AS sessions,
+                   MAX(CASE WHEN position = 1 THEN sets END) AS sets
+            FROM sessions WHERE position <= 3 GROUP BY exercise_id
+        )
+        SELECT e.id AS exercise_id, e.name, e.routine, e.active, a.weight,
+               COALESCE(a.sessions, 0) AS sessions, COALESCE(a.sets, 3) AS sets
+        FROM exercises e LEFT JOIN averages a ON a.exercise_id = e.id
+        ORDER BY e.active DESC, e.routine, e.sort_order, e.id
+    """, (log_date.isoformat(),)).fetchall()
+    return [dict(row) for row in rows]
+
+
+@app.get("/api/workouts/suggestions")
+def get_workout_suggestions(log_date: date):
+    conn = get_conn()
+    try:
+        return workout_suggestions(conn, log_date)
+    finally:
+        conn.close()
+
+
+@app.post("/api/workouts", status_code=201)
+def save_workout(entry: WorkoutEntry):
+    if entry.log_date > date.today():
+        raise HTTPException(422, "Kies vandaag of een eerdere datum")
+    ids = [exercise.exercise_id for exercise in entry.exercises]
+    if len(ids) != len(set(ids)):
+        raise HTTPException(422, "Kies elke oefening slechts eenmaal")
+    conn = get_conn()
+    try:
+        with conn:
+            suggestions = {item["exercise_id"]: item for item in workout_suggestions(conn, entry.log_date)}
+            if not set(ids).issubset(suggestions):
+                raise HTTPException(404, "Oefening niet gevonden")
+            for exercise in entry.exercises:
+                weight = suggestions[exercise.exercise_id]["weight"] if exercise.is_estimated else exercise.weight
+                estimated = exercise.is_estimated and weight is not None
+                last_set = conn.execute(
+                    "SELECT COALESCE(MAX(set_nr), 0) FROM logs WHERE date = ? AND exercise_id = ?",
+                    (entry.log_date.isoformat(), exercise.exercise_id),
+                ).fetchone()[0]
+                conn.executemany(
+                    "INSERT INTO logs (date, exercise_id, set_nr, weight, reps, is_estimated) VALUES (?, ?, ?, ?, ?, ?)",
+                    [(entry.log_date.isoformat(), exercise.exercise_id, last_set + offset + 1,
+                      weight, exercise.reps, int(estimated)) for offset in range(exercise.sets)],
+                )
+                refresh_prs(conn, exercise.exercise_id)
+    finally:
+        conn.close()
+    return {"status": "ok", "sets": sum(exercise.sets for exercise in entry.exercises)}
+
+
 @app.post("/api/logs")
 def save_log(entry: LogEntry):
     entry_date = (entry.log_date or date.today()).isoformat()
@@ -337,12 +415,27 @@ def update_log(log_id: int, entry: LogUpdate):
     conn = get_conn()
     try:
         with conn:
-            row = conn.execute("SELECT exercise_id FROM logs WHERE id = ?", (log_id,)).fetchone()
+            row = conn.execute("SELECT * FROM logs WHERE id = ?", (log_id,)).fetchone()
             if row is None:
                 raise HTTPException(404, "Set niet gevonden")
-            conn.execute("UPDATE logs SET weight = ?, reps = ?, notes = ? WHERE id = ?",
-                         (entry.weight, entry.reps, entry.notes or "", log_id))
+            exercise_id = entry.exercise_id if entry.exercise_id is not None else row["exercise_id"]
+            if not conn.execute("SELECT 1 FROM exercises WHERE id = ?", (exercise_id,)).fetchone():
+                raise HTTPException(404, "Oefening niet gevonden")
+            log_date = entry.log_date.isoformat() if entry.log_date else row["date"]
+            if log_date > date.today().isoformat():
+                raise HTTPException(422, "Kies vandaag of een eerdere datum")
+            set_nr = row["set_nr"]
+            if exercise_id != row["exercise_id"] or log_date != row["date"]:
+                set_nr = conn.execute(
+                    "SELECT COALESCE(MAX(set_nr), 0) + 1 FROM logs WHERE exercise_id = ? AND date = ?",
+                    (exercise_id, log_date),
+                ).fetchone()[0]
+            estimated = row["is_estimated"] if entry.is_estimated is None else int(entry.is_estimated)
+            conn.execute("UPDATE logs SET weight = ?, reps = ?, notes = ?, exercise_id = ?, date = ?, set_nr = ?, is_estimated = ? WHERE id = ?",
+                         (entry.weight, entry.reps, entry.notes or "", exercise_id, log_date, set_nr, estimated, log_id))
             refresh_prs(conn, row["exercise_id"])
+            if exercise_id != row["exercise_id"]:
+                refresh_prs(conn, exercise_id)
     finally:
         conn.close()
     return {"status": "ok"}
@@ -364,7 +457,7 @@ def get_previous_session(exercise_id: int):
         return []
     last_date = row["date"]
     cur.execute(
-        "SELECT set_nr, weight, reps, notes FROM logs WHERE exercise_id = ? AND date = ? ORDER BY set_nr",
+        "SELECT set_nr, weight, reps, notes, is_estimated FROM logs WHERE exercise_id = ? AND date = ? ORDER BY set_nr",
         (exercise_id, last_date),
     )
     sets = [dict(r) for r in cur.fetchall()]
@@ -384,7 +477,7 @@ def get_logs(log_date: Optional[date] = None):
     cur = conn.cursor()
     cur.execute(
         """SELECT l.id, l.date, l.exercise_id, e.name AS exercise_name,
-                  l.set_nr, l.weight, l.reps, l.is_pr, l.notes
+                  l.set_nr, l.weight, l.reps, l.is_pr, l.notes, l.is_estimated
            FROM logs l JOIN exercises e ON e.id = l.exercise_id
            WHERE l.date = ? ORDER BY l.id""",
         (selected_date,),
@@ -425,6 +518,79 @@ def get_progress(exercise_id: int):
 
 
 # --- Dashboard stats ---
+
+LEVEL_PHASES = (
+    ("De Wieg van het Regenwoud", "Beginnersfase", (
+        ("Baby Gorillatje", "Moet nog leren kruipen, hangt hulpeloos aan moeders rug en drinkt nog moedermelk."),
+        ("Melkmuil Makaak", "Gooit met bananenschillen, durft alleen naar de lichte roze dumbellset te kijken."),
+        ("Takjesbuiger", "Probeert zich op te trekken aan lianen; valt er meestal na twee seconden af."),
+        ("Gym-Chimpansee", "Maakt vooral veel kabaal bij het dumbellrek, maar tilt nog geen deuk in een pakje boter."),
+        ("Palmboom Schudder", "Eerste noob-gains; schudt bomen heen en weer om kokosnoten te laten vallen."),
+    )),
+    ("De Puber Apen", "De Bouwfase & Eerste Spiergroei", (
+        ("Baviaan op Pre-Workout", "Hyperactief, hartslag op 180, stuitert door de jungle op zoek naar zware stenen."),
+        ("Bananen-Bulker", "Eet alles wat los en vast zit in het struikgewas; de bulk is officieel begonnen."),
+        ("IJzerknagende Oerang-oetan", "Lange armen, perfecte hefboom voor deadlifts, begint langzaam gevaarlijk te worden."),
+        ("Jonge Sloper", "Sloopt bamboestengels met blote handen en weigert het squatrek te verlaten."),
+        ("Rotsensleper", "Begint rotsblokken van 100 kg door de modder te rollen puur voor het pompgevoel."),
+    )),
+    ("De Zilverruggelings", "Gevorderde Krachtpatsers", (
+        ("Eerstejaars Zilverrug", "De eerste grijze haren verschijnen op de rug; het fysiek begint angstaanjagend te worden."),
+        ("Borstkas Trommelaar", "Slaat zo hard op eigen borstkas na een zware set dat de hele vallei trilt."),
+        ("Schijven-Stapelaar", "Er passen bijna geen 20kg-plates meer op de barbell; traint met pure oerwoede."),
+        ("Mangrove Monster", "Breekt door plateaus heen alsof het rot hout is. Geen spierpijn, alleen honger."),
+        ("Territorium Bewaker", "Kijkt andere gymgangers weg bij de bench press met \u00e9\u00e9n doodse gorilla-blik."),
+    )),
+    ("Opperbeesten", "Zware Gewichten & Elite Tonnage", (
+        ("Kong Junior", "Direct nazaat van Skull Island. De apparaten kraken zodra hij erop gaat zitten."),
+        ("Gietijzer Vreter", "Verwerkt tonnen gewicht per sessie. Zweet puur vloeibaar testosteron."),
+        ("Silverback Berserker", "Gaat in trance voor elke PR-poging; ademt stoom uit en voelt geen vermoeidheid."),
+        ("Jungle Dictator", "Heerst over de halterzone. Wat hij vastpakt gaat omhoog, zonder compromis."),
+        ("Apex Primate", "Bovenaan de voedselketen van het ecosysteem. Geen natuurlijk roofdier over."),
+    )),
+    ("Primal Mythologie", "God Tier & Eindbazen", (
+        ("Vallei Pletter", "Laat bij elke squat de aarde beven tot in de dichtstbijzijnde nederzetting."),
+        ("Oer-Titaan", "Gebouwd uit vulkanisch basalt en pezen van staalkabel. Pure oerkracht."),
+        ("King Kong Tier", "Beklimt wolkenkrabbers puur als cardiotraining na een zware beensessie."),
+        ("Opperste Territorium Heerser", "Zelfs de jungle buigt voor zijn fysiek; benchmarks en records worden verpulverd."),
+        ("Ultra Alfa Gorilla", "De absolute oppergod van testosteron, gietijzer en spiermassa. Onbetwist, ontembaar en onverslaanbaar."),
+    )),
+)
+
+
+def get_level_progression(xp: int) -> dict:
+    max_level = sum(len(ranks) for _, _, ranks in LEVEL_PHASES)
+    level = min(xp // 500 + 1, max_level)
+    journey = []
+    phase_achievements = []
+    current = None
+    level_number = 1
+    for phase_number, (name, description, ranks) in enumerate(LEVEL_PHASES, start=1):
+        start = level_number
+        levels = []
+        for rank, detail in ranks:
+            item = {"level": level_number, "name": rank, "description": detail,
+                    "xp_required": (level_number - 1) * 500,
+                    "unlocked": level >= level_number, "current": level == level_number}
+            levels.append(item)
+            if item["current"]:
+                current = {"rank": rank, "rank_description": detail, "phase": name, "phase_number": phase_number}
+            level_number += 1
+        end = level_number - 1
+        journey.append({"number": phase_number, "name": name, "description": description,
+                        "start_level": start, "end_level": end, "levels": levels,
+                        "current": start <= level <= end, "completed": level >= end})
+        phase_achievements.append({
+            "id": f"phase{phase_number}", "title": name,
+            "description": f"Fase {phase_number} voltooid: bereik level {end} ({ranks[-1][0]}).",
+            "icon": "crown" if phase_number == len(LEVEL_PHASES) else "medal",
+            "progress": min(level, end), "target": end, "unlocked": level >= end,
+            "xp": 0, "category": "phase",
+        })
+    return {"level": level, **current, "max_level": max_level, "is_max_level": level == max_level,
+            "level_xp": 500 if level == max_level else xp % 500, "next_level_xp": 500,
+            "journey": journey, "phase_achievements": phase_achievements}
+
 
 def get_rewards(conn: sqlite3.Connection, today: date) -> dict:
     rows = conn.execute(
@@ -505,16 +671,15 @@ def get_rewards(conn: sqlite3.Connection, today: date) -> dict:
         for key, title, description, icon, value, target, bonus in milestones
     ]
     total_xp += sum(item["xp"] for item in achievements if item["unlocked"])
-    level = total_xp // 500 + 1
-    rank = "Starter" if level < 5 else "Doorzetter" if level < 15 else "Krachtpatser" if level < 30 else "Veteraan"
+    progression = get_level_progression(total_xp)
+    achievements.extend(progression.pop("phase_achievements"))
     current = days.get(today, {"sets": 0, "minutes": 0, "active": False, "xp": 0})
     calendar = []
     for offset in range(28):
         logged = today - timedelta(days=27 - offset)
         calendar.append({"date": logged.isoformat(), "active": days.get(logged, {}).get("active", False)})
     return {
-        "xp": total_xp, "level": level, "rank": rank, "level_xp": total_xp % 500,
-        "next_level_xp": 500, "today_xp": current["xp"],
+        "xp": total_xp, **progression, "today_xp": current["xp"],
         "weekly_streak": streak, "best_weekly_streak": best_streak,
         "weekly_days": week_days, "weekly_target": 3,
         "week": [{"date": (monday + timedelta(days=offset)).isoformat(),
