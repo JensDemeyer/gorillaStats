@@ -13,6 +13,25 @@ voor verdere ontwikkeling; de desktopbrowser dient vooral voor lokale tests.
 - Afbeeldingen en GIF's uploaden per oefening.
 - XP, levels, twaalf achievements, weekdoelen en een activiteitenkalender.
 
+## Tijdens Je Training
+
+- Gewicht en reps zijn optioneel: een set kan meteen worden opgeslagen.
+- Met het potlood bij een set kun je gewicht, reps en notities later aanvullen.
+	Dit kan tijdens de training of via het trainingslog met datumkeuze, ook op
+	een volgende dag. Ontbrekende waarden tellen niet mee als nulmetingen of PR's.
+- De rusttimer start alleen wanneer je zelf een tijd kiest.
+- Swipe naar links voor de volgende oefening, naar rechts voor de vorige.
+	De pijltjes doen hetzelfde. Nog niet opgeslagen invoer blijft tijdens deze
+	browsersessie per oefening behouden.
+- De vorige sessie staat bij de oefening; bij elke nieuwe set zie je de
+	overeenkomstige set van de vorige keer. Tik op een vorige set om die over te nemen.
+- Via **Schema aanpassen** kun je Push, Pull, Legs en eigen schema's hernoemen,
+	oefeningen aanpassen, toevoegen, verwijderen en herordenen. Oefeningen die
+	je uit een schema verwijdert, behouden hun trainingshistoriek.
+
+De bestaande database wordt bij het starten automatisch en transactioneel
+bijgewerkt voor optionele setgegevens. Bestaande logs blijven behouden.
+
 De backend gebruikt FastAPI en SQLite zonder ORM. De frontend bestaat uit een
 HTML-bestand met CSS en JavaScript, zonder buildstap.
 
@@ -35,7 +54,7 @@ geen extra tabellen, achtergrondtaken of dependencies nodig.
 Gerichte tests zonder extra testdependencies:
 
 ```powershell
-.\venv\Scripts\python.exe -m unittest test_rewards -v
+.\venv\Scripts\python.exe -m unittest test_rewards test_workout -v
 ```
 
 ## Lokaal starten (Windows PowerShell)

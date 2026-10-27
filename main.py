@@ -15,7 +15,7 @@ from typing import Optional
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
 # Config
@@ -59,8 +59,8 @@ def init_db():
             date        TEXT NOT NULL,
             exercise_id INTEGER NOT NULL REFERENCES exercises(id),
             set_nr      INTEGER NOT NULL,
-            weight      REAL NOT NULL,
-            reps        INTEGER NOT NULL,
+            weight      REAL,
+            reps        INTEGER,
             is_pr       INTEGER DEFAULT 0,
             notes       TEXT
         );
@@ -84,6 +84,23 @@ def init_db():
             source         TEXT DEFAULT 'manual'
         );
     """)
+
+    conn.execute("BEGIN")
+    columns = {row["name"] for row in cur.execute("PRAGMA table_info(exercises)")}
+    if "active" not in columns:
+        cur.execute("ALTER TABLE exercises ADD COLUMN active INTEGER NOT NULL DEFAULT 1")
+    if "sort_order" not in columns:
+        cur.execute("ALTER TABLE exercises ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
+    log_columns = list(cur.execute("PRAGMA table_info(logs)"))
+    if any(row["notnull"] for row in log_columns if row["name"] in ("weight", "reps")):
+        cur.execute("""CREATE TABLE logs_optional (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL,
+            exercise_id INTEGER NOT NULL REFERENCES exercises(id), set_nr INTEGER NOT NULL,
+            weight REAL, reps INTEGER, is_pr INTEGER DEFAULT 0, notes TEXT
+        )""")
+        cur.execute("INSERT INTO logs_optional SELECT id, date, exercise_id, set_nr, weight, reps, is_pr, notes FROM logs")
+        cur.execute("DROP TABLE logs")
+        cur.execute("ALTER TABLE logs_optional RENAME TO logs")
 
     # Seed default exercises once
     cur.execute("SELECT COUNT(*) FROM exercises")
@@ -126,11 +143,27 @@ def init_db():
 
 class LogEntry(BaseModel):
     exercise_id: int
-    set_nr: int
-    weight: float
-    reps: int
+    set_nr: int = Field(ge=1)
+    weight: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    reps: Optional[int] = Field(default=None, ge=1)
     notes: Optional[str] = ""
-    log_date: Optional[str] = None
+    log_date: Optional[date] = None
+
+
+class LogUpdate(BaseModel):
+    weight: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    reps: Optional[int] = Field(default=None, ge=1)
+    notes: Optional[str] = ""
+
+
+class RoutineExercise(BaseModel):
+    id: Optional[int] = None
+    name: str = Field(min_length=1)
+
+
+class RoutineUpdate(BaseModel):
+    name: str = Field(min_length=1)
+    exercises: list[RoutineExercise] = Field(min_length=1)
 
 
 class ExerciseCreate(BaseModel):
@@ -177,7 +210,7 @@ def check_pr(conn: sqlite3.Connection, exercise_id: int, weight: float, reps: in
     best_weight = row[0] if row[0] is not None else 0
 
     cur.execute(
-        "SELECT weight, reps FROM logs WHERE exercise_id = ?",
+        "SELECT weight, reps FROM logs WHERE exercise_id = ? AND weight IS NOT NULL AND reps IS NOT NULL",
         (exercise_id,),
     )
     rows = cur.fetchall()
@@ -188,6 +221,20 @@ def check_pr(conn: sqlite3.Connection, exercise_id: int, weight: float, reps: in
 
     new_e1rm = epley_e1rm(weight, reps)
     return weight > best_weight or new_e1rm > best_e1rm
+
+
+def refresh_prs(conn: sqlite3.Connection, exercise_id: int):
+    best_weight = 0
+    best_e1rm = 0
+    for row in conn.execute("SELECT * FROM logs WHERE exercise_id = ? ORDER BY date, id", (exercise_id,)).fetchall():
+        complete = row["weight"] is not None and row["reps"] is not None
+        estimated = epley_e1rm(row["weight"], row["reps"]) if complete else 0
+        is_pr = complete and (row["weight"] > best_weight or estimated > best_e1rm)
+        if row["is_pr"] != int(is_pr):
+            conn.execute("UPDATE logs SET is_pr = ? WHERE id = ?", (int(is_pr), row["id"]))
+        if complete:
+            best_weight = max(best_weight, row["weight"])
+            best_e1rm = max(best_e1rm, estimated)
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +252,7 @@ def get_routines():
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, routine, name, media_url, notes FROM exercises ORDER BY routine, id"
+        "SELECT id, routine, name, media_url, notes FROM exercises WHERE active = 1 ORDER BY routine, sort_order, id"
     )
     rows = cur.fetchall()
     conn.close()
@@ -217,11 +264,13 @@ def get_routines():
 
 @app.post("/api/exercises", status_code=201)
 def add_exercise(body: ExerciseCreate):
+    if not body.routine.strip() or not body.name.strip():
+        raise HTTPException(422, "Routine en naam zijn verplicht")
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO exercises (routine, name, notes) VALUES (?, ?, ?)",
-        (body.routine.strip(), body.name.strip(), body.notes),
+        "INSERT INTO exercises (routine, name, notes, sort_order) VALUES (?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM exercises WHERE routine = ?))",
+        (body.routine.strip(), body.name.strip(), body.notes, body.routine.strip()),
     )
     new_id = cur.lastrowid
     conn.commit()
@@ -229,25 +278,74 @@ def add_exercise(body: ExerciseCreate):
     return {"id": new_id, "routine": body.routine, "name": body.name}
 
 
+@app.put("/api/routines/{routine:path}")
+def update_routine(routine: str, body: RoutineUpdate):
+    name = body.name.strip()
+    if not name or any(not item.name.strip() for item in body.exercises):
+        raise HTTPException(422, "Namen mogen niet leeg zijn")
+    conn = get_conn()
+    try:
+        with conn:
+            existing = {row["id"] for row in conn.execute(
+                "SELECT id FROM exercises WHERE routine = ? AND active = 1", (routine,))}
+            if not existing:
+                raise HTTPException(404, "Schema niet gevonden")
+            ids = [item.id for item in body.exercises if item.id is not None]
+            if len(ids) != len(set(ids)) or not set(ids).issubset(existing):
+                raise HTTPException(422, "Ongeldige oefeningen")
+            if name != routine and conn.execute(
+                "SELECT 1 FROM exercises WHERE routine = ? AND active = 1", (name,)).fetchone():
+                raise HTTPException(409, "Dit schema bestaat al")
+            conn.execute("UPDATE exercises SET active = 0 WHERE routine = ? AND active = 1", (routine,))
+            for position, item in enumerate(body.exercises):
+                if item.id is None:
+                    conn.execute("INSERT INTO exercises (routine, name, sort_order) VALUES (?, ?, ?)",
+                                 (name, item.name.strip(), position))
+                else:
+                    conn.execute("UPDATE exercises SET routine = ?, name = ?, sort_order = ?, active = 1 WHERE id = ?",
+                                 (name, item.name.strip(), position, item.id))
+    finally:
+        conn.close()
+    return {"status": "ok"}
+
+
 # --- Logs ---
 
 @app.post("/api/logs")
 def save_log(entry: LogEntry):
-    entry_date = entry.log_date or date.today().isoformat()
+    entry_date = (entry.log_date or date.today()).isoformat()
     conn = get_conn()
-
-    is_pr = 0
-    if entry.weight and entry.reps:
-        is_pr = 1 if check_pr(conn, entry.exercise_id, entry.weight, entry.reps) else 0
+    if not conn.execute("SELECT 1 FROM exercises WHERE id = ?", (entry.exercise_id,)).fetchone():
+        conn.close()
+        raise HTTPException(404, "Oefening niet gevonden")
 
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO logs (date, exercise_id, set_nr, weight, reps, is_pr, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (entry_date, entry.exercise_id, entry.set_nr, entry.weight, entry.reps, is_pr, entry.notes or ""),
+        (entry_date, entry.exercise_id, entry.set_nr, entry.weight, entry.reps, 0, entry.notes or ""),
     )
+    log_id = cur.lastrowid
+    refresh_prs(conn, entry.exercise_id)
+    is_pr = conn.execute("SELECT is_pr FROM logs WHERE id = ?", (log_id,)).fetchone()[0]
     conn.commit()
     conn.close()
-    return {"status": "ok", "is_pr": bool(is_pr)}
+    return {"status": "ok", "id": log_id, "is_pr": bool(is_pr)}
+
+
+@app.put("/api/logs/{log_id}")
+def update_log(log_id: int, entry: LogUpdate):
+    conn = get_conn()
+    try:
+        with conn:
+            row = conn.execute("SELECT exercise_id FROM logs WHERE id = ?", (log_id,)).fetchone()
+            if row is None:
+                raise HTTPException(404, "Set niet gevonden")
+            conn.execute("UPDATE logs SET weight = ?, reps = ?, notes = ? WHERE id = ?",
+                         (entry.weight, entry.reps, entry.notes or "", log_id))
+            refresh_prs(conn, row["exercise_id"])
+    finally:
+        conn.close()
+    return {"status": "ok"}
 
 
 @app.get("/api/logs/previous/{exercise_id}")
@@ -276,7 +374,12 @@ def get_previous_session(exercise_id: int):
 
 @app.get("/api/logs/today")
 def get_today_logs():
-    today = date.today().isoformat()
+    return get_logs()
+
+
+@app.get("/api/logs")
+def get_logs(log_date: Optional[date] = None):
+    selected_date = (log_date or date.today()).isoformat()
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
@@ -284,7 +387,7 @@ def get_today_logs():
                   l.set_nr, l.weight, l.reps, l.is_pr, l.notes
            FROM logs l JOIN exercises e ON e.id = l.exercise_id
            WHERE l.date = ? ORDER BY l.id""",
-        (today,),
+        (selected_date,),
     )
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
@@ -294,7 +397,10 @@ def get_today_logs():
 @app.delete("/api/logs/{log_id}")
 def delete_log(log_id: int):
     conn = get_conn()
+    row = conn.execute("SELECT exercise_id FROM logs WHERE id = ?", (log_id,)).fetchone()
     conn.execute("DELETE FROM logs WHERE id = ?", (log_id,))
+    if row:
+        refresh_prs(conn, row["exercise_id"])
     conn.commit()
     conn.close()
     return {"status": "deleted"}
@@ -614,3 +720,8 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 @app.get("/")
 def serve_index():
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/logo.png", include_in_schema=False)
+def serve_logo():
+    return FileResponse(BASE_DIR / "img" / "zl5vhf5d3m6ce1pjma536glrqn33.png", media_type="image/png")

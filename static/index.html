@@ -6,7 +6,9 @@
   <meta name="description" content="GorillaStats – Self-hosted Jungle Gym Workout Tracker">
   <meta name="theme-color" content="#0d140e">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>GorillaStats 🦍</title>
+  <title>GorillaStats</title>
+  <link rel="icon" type="image/png" href="/logo.png">
+  <link rel="apple-touch-icon" href="/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -61,18 +63,27 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 8px;
       margin-bottom: 10px;
     }
     .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
       font-family: 'Barlow Condensed', sans-serif;
       font-size: 1.8rem;
       font-weight: 900;
-      letter-spacing: 2px;
+      letter-spacing: 0;
       text-transform: uppercase;
+    }
+    .logo img { width: 64px; height: 64px; object-fit: contain; flex-shrink: 0; }
+    .logo-wordmark {
       background: linear-gradient(135deg, var(--gold-bright), var(--gold));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+      white-space: nowrap;
     }
     .logo span { color: var(--text-dim); -webkit-text-fill-color: var(--text-dim); font-size: 1.4rem; }
 
@@ -439,6 +450,22 @@
     .log-weight { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 1rem; color: var(--text-bright); }
     .log-del { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 6px; font-size: 1rem; flex-shrink: 0; }
     .log-del:hover { color: var(--blood); }
+    .exercise-nav { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .exercise-nav span { text-align: center; color: var(--text-dim); font-size: 0.85rem; }
+    .icon-button { width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-deep); color: var(--text-bright); font-size: 1.2rem; cursor: pointer; flex-shrink: 0; }
+    button:disabled { cursor: default; }
+    #page-workout { touch-action: pan-y; }
+    #previousSetHint { margin: 10px 0; color: var(--gold); font-size: 0.9rem; overflow-wrap: anywhere; }
+    .prev-set-chip.current { border-color: var(--gold); color: var(--text-bright); }
+    .editor-dialog { width: calc(100% - 24px); max-width: 560px; max-height: 85dvh; margin: auto; padding: 22px 16px; background: var(--bg-card); color: var(--text-bright); border: 1px solid var(--border); border-radius: 8px; overflow-y: auto; }
+    .editor-dialog::backdrop { background: rgba(0,0,0,0.7); }
+    .editor-dialog h2 { font: 800 1.3rem 'Barlow Condensed', sans-serif; margin-bottom: 18px; overflow-wrap: anywhere; }
+    .routine-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 38px); gap: 5px; margin-bottom: 10px; }
+    .routine-row textarea { min-width: 0; margin: 0; padding: 10px 8px; line-height: 1.35; font-size: 0.9rem; resize: vertical; field-sizing: content; min-height: 64px; }
+    .routine-row .icon-button { align-self: center; }
+    .routine-row .icon-button { width: 38px; height: 44px; }
+    .log-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .log-actions .icon-button { width: 38px; height: 40px; }
 
     /* ===== PR WALL ===== */
     .pr-item {
@@ -643,7 +670,10 @@
 <!-- ===== HEADER ===== -->
 <header>
   <div class="header-top">
-    <div class="logo">Gorilla<span>Stats</span> 🦍</div>
+    <div class="logo">
+      <img src="/logo.png" alt="" width="64" height="64" fetchpriority="high">
+      <div class="logo-wordmark">Gorilla<span>Stats</span></div>
+    </div>
     <div class="header-actions">
       <div style="font-size:0.75rem;color:var(--text-muted);text-align:right;line-height:1.4;" id="headerDate"></div>
       <button class="sound-toggle" id="soundToggle" onclick="toggleSound()" aria-label="Geluid inschakelen" aria-pressed="false" title="Geluid inschakelen">🔇</button>
@@ -739,7 +769,9 @@
 
     <!-- Today log -->
     <div class="card">
-      <div class="card-title">📋 Sets Vandaag</div>
+      <div class="card-title">📋 Trainingslog</div>
+      <label for="logDate">Datum</label>
+      <input type="date" id="logDate" onchange="loadTodayLog()">
       <div id="todayLog">
         <div class="empty-state"><div class="icon">💤</div><p>Nog geen sets gelogd vandaag.</p></div>
       </div>
@@ -767,6 +799,12 @@
         </div>
       </div>
 
+      <div class="exercise-nav">
+        <button class="icon-button" id="previousExercise" onclick="navigateExercise(-1)" title="Vorige oefening" aria-label="Vorige oefening">←</button>
+        <span id="exercisePosition"></span>
+        <button class="icon-button" id="nextExercise" onclick="navigateExercise(1)" title="Volgende oefening" aria-label="Volgende oefening">→</button>
+      </div>
+
       <!-- Media box -->
       <div id="mediaBox">
         <div id="mediaPlaceholder">
@@ -788,26 +826,29 @@
       <div class="input-row">
         <div class="field">
           <label>Set Nr</label>
-          <input type="number" id="setNr" value="1" min="1" inputmode="numeric">
+          <input type="number" id="setNr" value="1" min="1" inputmode="numeric" oninput="updatePreviousSetHint()">
         </div>
         <div class="field">
-          <label>Reps</label>
-          <input type="number" id="reps" placeholder="8" min="1" inputmode="numeric">
+          <label>Reps (optioneel)</label>
+          <input type="number" id="reps" placeholder="" min="1" inputmode="numeric">
         </div>
       </div>
       <div class="field">
-        <label>Gewicht (kg)</label>
-        <input type="number" step="0.5" id="weight" placeholder="60.0" inputmode="decimal">
+        <label>Gewicht (kg, optioneel)</label>
+        <input type="number" step="0.5" min="0" id="weight" placeholder="" inputmode="decimal">
       </div>
       <div class="field" style="margin-bottom:14px">
         <label>Notities (optioneel)</label>
         <input type="text" id="notes" placeholder="RPE 8, goeie set...">
       </div>
 
+      <div id="previousSetHint" role="status" aria-live="polite"></div>
       <button class="btn btn-primary" id="saveSetButton" onclick="submitLog()">💪 SET OPSLAAN</button>
+      <div id="workoutSets"></div>
 
       <div style="margin-top:12px">
         <button class="btn btn-ghost btn-sm" onclick="openAddExerciseModal()">+ Oefening Toevoegen</button>
+        <button class="btn btn-ghost btn-sm" onclick="openRoutineEditor()">Schema aanpassen</button>
       </div>
     </div>
 
@@ -960,6 +1001,35 @@
 </div>
 
 <!-- ===== TOAST ===== -->
+<dialog class="editor-dialog" id="logEditor" aria-labelledby="logEditorTitle">
+  <h2 id="logEditorTitle">Set aanpassen</h2>
+  <form onsubmit="saveLogEdit(event)">
+    <label for="editWeight">Gewicht (kg, optioneel)</label>
+    <input id="editWeight" type="number" min="0" step="0.5" inputmode="decimal">
+    <label for="editReps">Reps (optioneel)</label>
+    <input id="editReps" type="number" min="1" inputmode="numeric">
+    <label for="editNotes">Notities</label>
+    <input id="editNotes" type="text">
+    <div class="btn-row">
+      <button type="button" class="btn btn-ghost" onclick="document.getElementById('logEditor').close()">Annuleer</button>
+      <button class="btn btn-gold" id="saveLogEditButton" type="submit">Opslaan</button>
+    </div>
+  </form>
+</dialog>
+<dialog class="editor-dialog" id="routineEditor" aria-labelledby="routineEditorTitle">
+  <h2 id="routineEditorTitle">Schema aanpassen</h2>
+  <form onsubmit="saveRoutine(event)">
+    <label for="editRoutineName">Naam schema</label>
+    <input id="editRoutineName" required type="text">
+    <label>Oefeningen</label>
+    <div id="routineRows"></div>
+    <button class="btn btn-ghost btn-sm" type="button" onclick="addRoutineRow()">+ Oefening</button>
+    <div class="btn-row section-gap">
+      <button class="btn btn-ghost" type="button" onclick="document.getElementById('routineEditor').close()">Annuleer</button>
+      <button class="btn btn-gold" id="saveRoutineButton" type="submit">Opslaan</button>
+    </div>
+  </form>
+</dialog>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <dialog class="reward-dialog" id="rewardDialog" aria-labelledby="rewardTitle" aria-describedby="rewardDescription">
@@ -985,6 +1055,15 @@
   let lastRewards = null;
   let statsRequest = 0;
   let soundEnabled = false;
+  let selectedExerciseId = '';
+  let exerciseRequest = 0;
+  let logRequest = 0;
+  let previousSession = null;
+  let editingLogId = null;
+  let editingRoutine = '';
+  let routineDraft = [];
+  const exerciseDrafts = new Map();
+  const logsById = new Map();
   try { soundEnabled = localStorage.getItem('gorilla-sound') === 'on'; } catch (error) {}
   const rewardIcons = { flag: '🚩', flame: '🔥', medal: '🏅', crown: '👑', dumbbell: '💪', trophy: '🏆', heart: '❤️', chart: '📈' };
 
@@ -1084,6 +1163,21 @@
     return val.toFixed(decimals);
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+  }
+
+  function setSummary(set) {
+    if (set.weight == null && set.reps == null) return 'Nog aan te vullen';
+    return `${set.weight == null ? '? kg' : `${set.weight} kg`} × ${set.reps == null ? '? reps' : `${set.reps} reps`}`;
+  }
+
+  async function api(url, options) {
+    const response = await fetch(url, options);
+    if (!response.ok) throw new Error('Opslaan of laden mislukt. Probeer opnieuw.');
+    return response.json();
+  }
+
   function setHeaderDate() {
     const d = new Date();
     const opts = { weekday: 'long', day: 'numeric', month: 'long' };
@@ -1116,6 +1210,8 @@
   async function init() {
     setHeaderDate();
     updateSoundButton();
+    const today = new Date();
+    document.getElementById('logDate').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     await loadRoutines();
     loadStats();
     loadTodayLog();
@@ -1125,15 +1221,18 @@
     populateDashExerciseSelect();
   }
 
-  async function loadRoutines() {
+  async function loadRoutines(preferredRoutine, preferredExercise) {
     const res = await fetch('/api/routines');
     routinesData = await res.json();
 
     const routineSelect = document.getElementById('routineSelect');
+    const routine = preferredRoutine || routineSelect.value;
+    const exercise = preferredExercise || document.getElementById('exerciseSelect').value;
     routineSelect.innerHTML = Object.keys(routinesData)
-      .map(r => `<option value="${r}">${r}</option>`).join('');
+      .map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+    if (routinesData[routine]) routineSelect.value = routine;
 
-    onRoutineChange();
+    await onRoutineChange(exercise);
     populateDashExerciseSelect();
     populateRoutineDatalist();
   }
@@ -1141,41 +1240,94 @@
   function populateDashExerciseSelect() {
     const sel = document.getElementById('dashExerciseSelect');
     const all = Object.values(routinesData).flat();
-    sel.innerHTML = all.map(e => `<option value="${e.id}">${e.routine} › ${e.name}</option>`).join('');
+    sel.innerHTML = all.map(e => `<option value="${e.id}">${escapeHtml(e.routine)} › ${escapeHtml(e.name)}</option>`).join('');
   }
 
   function populateRoutineDatalist() {
     document.getElementById('routineDatalist').innerHTML =
-      Object.keys(routinesData).map(r => `<option value="${r}">`).join('');
+      Object.keys(routinesData).map(r => `<option value="${escapeHtml(r)}">`).join('');
   }
 
   // ================================================================
   // EXERCISE SELECTION
   // ================================================================
-  function onRoutineChange() {
+  async function onRoutineChange(preferredExercise) {
     const routine = document.getElementById('routineSelect').value;
     const exSel = document.getElementById('exerciseSelect');
     const exercises = routinesData[routine] || [];
-    exSel.innerHTML = exercises.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
-    onExerciseChange();
+    exSel.innerHTML = exercises.map(e => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('');
+    if (exercises.some(ex => String(ex.id) === String(preferredExercise))) exSel.value = preferredExercise;
+    await onExerciseChange();
   }
 
   async function onExerciseChange() {
     const exId = document.getElementById('exerciseSelect').value;
     if (!exId) return;
-
-    // Update media box
+    if (selectedExerciseId) {
+      exerciseDrafts.set(selectedExerciseId, Object.fromEntries(['weight', 'reps', 'notes'].map(id => [id, document.getElementById(id).value])));
+    }
+    selectedExerciseId = exId;
+    const request = ++exerciseRequest;
+    const draft = exerciseDrafts.get(exId) || {};
+    for (const id of ['weight', 'reps', 'notes']) document.getElementById(id).value = draft[id] || '';
+    previousSession = null;
+    document.getElementById('setNr').value = 1;
+    document.getElementById('prevSession').style.display = 'none';
+    document.getElementById('previousSetHint').textContent = 'Vorige sessie laden...';
+    document.getElementById('workoutSets').innerHTML = '';
+    document.getElementById('saveSetButton').disabled = true;
     const routine = document.getElementById('routineSelect').value;
     const exList = routinesData[routine] || [];
     const ex = exList.find(e => String(e.id) === String(exId));
     updateMediaBox(ex);
-
-    // Load previous session
-    await loadPreviousSession(exId);
-
-    // Auto-increment setNr based on today's log for this exercise
-    autoSetNr(exId);
+    updateExerciseNavigation();
+    try {
+      const [previous, logs] = await Promise.all([api(`/api/logs/previous/${exId}`), api('/api/logs/today')]);
+      if (request !== exerciseRequest) return;
+      previousSession = previous;
+      const sets = logs.filter(log => String(log.exercise_id) === exId);
+      document.getElementById('setNr').value = Math.max(0, ...sets.map(set => set.set_nr)) + 1;
+      renderWorkoutSets(logs);
+      updatePreviousSetHint();
+    } catch (error) {
+      if (request === exerciseRequest) {
+        document.getElementById('previousSetHint').textContent = 'Vorige sessie niet beschikbaar';
+        toast(error.message);
+      }
+    } finally {
+      if (request === exerciseRequest) document.getElementById('saveSetButton').disabled = false;
+    }
   }
+
+  function updateExerciseNavigation() {
+    const select = document.getElementById('exerciseSelect');
+    document.getElementById('exercisePosition').textContent = `${select.selectedIndex + 1} / ${select.options.length}`;
+    document.getElementById('previousExercise').disabled = select.selectedIndex <= 0;
+    document.getElementById('nextExercise').disabled = select.selectedIndex >= select.options.length - 1;
+  }
+
+  function navigateExercise(direction) {
+    const select = document.getElementById('exerciseSelect');
+    const next = select.selectedIndex + direction;
+    if (next < 0 || next >= select.options.length) return;
+    select.selectedIndex = next;
+    onExerciseChange();
+  }
+
+  let swipeStart = null;
+  const workoutPage = document.getElementById('page-workout');
+  workoutPage.addEventListener('touchstart', event => {
+    swipeStart = event.touches.length === 1 && !event.target.closest('input, select, textarea, button, label, #workoutSets')
+      ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
+  }, { passive: true });
+  workoutPage.addEventListener('touchcancel', () => { swipeStart = null; }, { passive: true });
+  workoutPage.addEventListener('touchend', event => {
+    if (!swipeStart) return;
+    const dx = event.changedTouches[0].clientX - swipeStart.x;
+    const dy = event.changedTouches[0].clientY - swipeStart.y;
+    swipeStart = null;
+    if (Math.abs(dx) >= 60 && Math.abs(dx) > Math.abs(dy) * 1.5) navigateExercise(dx < 0 ? 1 : -1);
+  }, { passive: true });
 
   function updateMediaBox(ex) {
     const img = document.getElementById('mediaImg');
@@ -1192,48 +1344,42 @@
     document.getElementById('mediaFileInput').dataset.exId = ex ? ex.id : '';
   }
 
-  async function loadPreviousSession(exId) {
-    const res = await fetch(`/api/logs/previous/${exId}`);
-    const data = await res.json();
+  function updatePreviousSetHint() {
+    const data = previousSession;
     const container = document.getElementById('prevSession');
     const chips = document.getElementById('prevSetChips');
+    const currentSet = parseInt(document.getElementById('setNr').value) || 1;
+    document.getElementById('weight').placeholder = '';
+    document.getElementById('reps').placeholder = '';
 
     if (!data || !data.sets || data.sets.length === 0) {
       container.style.display = 'none';
+      document.getElementById('previousSetHint').textContent = 'Nog geen vorige sessie';
       return;
     }
 
+    container.querySelector('strong').textContent = `Vorige sessie · ${data.date}`;
     chips.innerHTML = data.sets.map(s =>
-      `<span class="prev-set-chip" onclick="prefillSet(${s.weight},${s.reps})">
-        Set ${s.set_nr}: <strong>${s.weight}kg × ${s.reps}</strong>
-      </span>`
+      `<button type="button" class="prev-set-chip${s.set_nr === currentSet ? ' current' : ''}" onclick="prefillSet(${s.weight},${s.reps})">
+        Set ${s.set_nr}: ${setSummary(s)}
+      </button>`
     ).join('');
 
     container.style.display = 'block';
 
-    // Auto-fill with first set of previous session if fields are empty
-    if (data.sets.length > 0) {
-      const w = document.getElementById('weight');
-      const r = document.getElementById('reps');
-      const setNrEl = document.getElementById('setNr');
-      const currentSet = parseInt(setNrEl.value) || 1;
-      const prevSet = data.sets.find(s => s.set_nr === currentSet) || data.sets[0];
-      if (!w.value) w.placeholder = prevSet.weight;
-      if (!r.value) r.placeholder = prevSet.reps;
+    const previous = data.sets.find(set => set.set_nr === currentSet);
+    document.getElementById('previousSetHint').textContent = previous
+      ? `Vorige keer · set ${currentSet}: ${setSummary(previous)}`
+      : `Vorige keer: ${data.sets.length} sets · geen set ${currentSet}`;
+    if (previous) {
+      document.getElementById('weight').placeholder = previous.weight ?? '';
+      document.getElementById('reps').placeholder = previous.reps ?? '';
     }
   }
 
   function prefillSet(weight, reps) {
-    document.getElementById('weight').value = weight;
-    document.getElementById('reps').value = reps;
-  }
-
-  async function autoSetNr(exId) {
-    // Count how many sets have been logged for this exercise today
-    const res = await fetch('/api/logs/today');
-    const logs = await res.json();
-    const setsToday = logs.filter(l => String(l.exercise_id) === String(exId));
-    document.getElementById('setNr').value = setsToday.length + 1;
+    document.getElementById('weight').value = weight ?? '';
+    document.getElementById('reps').value = reps ?? '';
   }
 
   // ================================================================
@@ -1243,12 +1389,17 @@
     const button = document.getElementById('saveSetButton');
     if (button.disabled) return;
     const exId = parseInt(document.getElementById('exerciseSelect').value);
-    const setNr = parseInt(document.getElementById('setNr').value);
-    const weight = parseFloat(document.getElementById('weight').value);
-    const reps = parseInt(document.getElementById('reps').value);
+    const setNr = Number(document.getElementById('setNr').value);
+    const weight = document.getElementById('weight').value === '' ? null : Number(document.getElementById('weight').value);
+    const reps = document.getElementById('reps').value === '' ? null : Number(document.getElementById('reps').value);
     const notes = document.getElementById('notes').value;
 
-    if (!weight || !reps) { toast('⚠️ Vul gewicht en reps in!'); return; }
+    if (!Number.isInteger(setNr) || setNr < 1 || !exId ||
+        (weight != null && (!Number.isFinite(weight) || weight < 0)) ||
+        (reps != null && (!Number.isInteger(reps) || reps < 1))) {
+      toast('Controleer setnummer, gewicht en reps.'); return;
+    }
+    const request = exerciseRequest;
 
     button.disabled = true;
     try {
@@ -1260,11 +1411,14 @@
     if (!res.ok) throw new Error('Set opslaan mislukt. Probeer opnieuw.');
     const data = await res.json();
 
-    // Increment set nr
-    document.getElementById('setNr').value = setNr + 1;
-    document.getElementById('weight').value = '';
-    document.getElementById('reps').value = '';
-    document.getElementById('notes').value = '';
+    exerciseDrafts.delete(String(exId));
+    if (request === exerciseRequest) {
+      document.getElementById('setNr').value = setNr + 1;
+      document.getElementById('weight').value = '';
+      document.getElementById('reps').value = '';
+      document.getElementById('notes').value = '';
+      updatePreviousSetHint();
+    }
 
     // PR celebration
     if (data.is_pr) {
@@ -1273,29 +1427,14 @@
       toast(`✅ Set ${setNr} opgeslagen!`);
     }
 
-    // Start rest timer automatically (90s default)
-    startTimer(90);
-
     // Refresh today log & stats
     loadTodayLog();
     await loadStats(true);
 
-    // Update placeholder for next set
-    const nextSet = setNr + 1;
-    const routine = document.getElementById('routineSelect').value;
-    const exList = routinesData[routine] || [];
-    const prevData = await fetch(`/api/logs/previous/${exId}`).then(r => r.json());
-    if (prevData && prevData.sets) {
-      const ps = prevData.sets.find(s => s.set_nr === nextSet);
-      if (ps) {
-        document.getElementById('weight').placeholder = ps.weight;
-        document.getElementById('reps').placeholder = ps.reps;
-      }
-    }
     } catch (error) {
       toast(error.message || 'Geen verbinding. Probeer opnieuw.');
     } finally {
-      button.disabled = false;
+      if (request === exerciseRequest) button.disabled = false;
     }
   }
 
@@ -1438,7 +1577,7 @@
     // Refresh selects
     const routineSelect = document.getElementById('routineSelect');
     routineSelect.innerHTML = Object.keys(routinesData)
-      .map(r => `<option value="${r}">${r}</option>`).join('');
+      .map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
     routineSelect.value = routine;
     onRoutineChange();
 
@@ -1459,6 +1598,56 @@
   // ================================================================
   // STATS & DASHBOARD
   // ================================================================
+  function openRoutineEditor() {
+    editingRoutine = document.getElementById('routineSelect').value;
+    routineDraft = (routinesData[editingRoutine] || []).map(ex => ({ id: ex.id, name: ex.name }));
+    if (!routineDraft.length) return;
+    document.getElementById('editRoutineName').value = editingRoutine;
+    renderRoutineRows();
+    document.getElementById('routineEditor').showModal();
+  }
+
+  function renderRoutineRows() {
+    document.getElementById('routineRows').innerHTML = routineDraft.map((ex, index) => `
+      <div class="routine-row">
+        <textarea aria-label="Oefening ${index + 1}" required rows="3" oninput="routineDraft[${index}].name = this.value">${escapeHtml(ex.name)}</textarea>
+        <button type="button" class="icon-button" title="Omhoog" aria-label="Oefening ${index + 1} omhoog" ${index === 0 ? 'disabled' : ''} onclick="moveRoutineRow(${index}, -1)">↑</button>
+        <button type="button" class="icon-button" title="Omlaag" aria-label="Oefening ${index + 1} omlaag" ${index === routineDraft.length - 1 ? 'disabled' : ''} onclick="moveRoutineRow(${index}, 1)">↓</button>
+        <button type="button" class="icon-button" title="Uit schema verwijderen" aria-label="Oefening ${index + 1} verwijderen" ${routineDraft.length === 1 ? 'disabled' : ''} onclick="routineDraft.splice(${index}, 1); renderRoutineRows()">×</button>
+      </div>`).join('');
+  }
+
+  function moveRoutineRow(index, direction) {
+    const target = index + direction;
+    [routineDraft[index], routineDraft[target]] = [routineDraft[target], routineDraft[index]];
+    renderRoutineRows();
+  }
+
+  function addRoutineRow() {
+    routineDraft.push({ name: '' });
+    renderRoutineRows();
+    document.querySelector('#routineRows .routine-row:last-child textarea').focus();
+  }
+
+  async function saveRoutine(event) {
+    event.preventDefault();
+    const button = document.getElementById('saveRoutineButton');
+    if (button.disabled) return;
+    const name = document.getElementById('editRoutineName').value.trim();
+    if (!name || routineDraft.some(ex => !ex.name.trim())) { toast('Vul alle namen in.'); return; }
+    button.disabled = true;
+    try {
+      await api(`/api/routines/${encodeURIComponent(editingRoutine)}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, exercises: routineDraft })
+      });
+      await loadRoutines(name);
+      document.getElementById('routineEditor').close();
+      toast('Schema opgeslagen');
+    } catch (error) { toast(error.message); }
+    finally { button.disabled = false; }
+  }
+
   async function loadStats(celebrate = false) {
     const request = ++statsRequest;
     try {
@@ -1496,30 +1685,93 @@
   // TODAY LOG
   // ================================================================
   async function loadTodayLog() {
-    const res = await fetch('/api/logs/today');
-    const logs = await res.json();
+    const request = ++logRequest;
+    const selectedDate = document.getElementById('logDate').value;
+    try {
+    const [logs, todayLogs] = await Promise.all([
+      api(`/api/logs${selectedDate ? `?log_date=${encodeURIComponent(selectedDate)}` : ''}`),
+      api('/api/logs/today')
+    ]);
+    if (request !== logRequest) return;
     const container = document.getElementById('todayLog');
+    renderWorkoutSets(todayLogs);
     if (!logs.length) {
-      container.innerHTML = '<div class="empty-state"><div class="icon">💤</div><p>Nog geen sets gelogd vandaag.</p></div>';
+      container.innerHTML = '<div class="empty-state"><p>Geen sets op deze datum.</p></div>';
       return;
     }
-    container.innerHTML = logs.map(l => `
-      <div class="log-item" id="logitem-${l.id}">
+    container.innerHTML = renderLogItems(logs);
+    } catch (error) { if (request === logRequest) toast(error.message); }
+  }
+
+  function renderLogItems(logs) {
+    for (const log of logs) logsById.set(log.id, log);
+    return logs.map(l => `
+      <div class="log-item" data-log-id="${l.id}">
         <span class="log-badge${l.is_pr ? ' pr-badge' : ''}">Set ${l.set_nr}${l.is_pr ? ' 🔥' : ''}</span>
         <div class="log-info">
-          <div class="log-ex">${l.exercise_name}</div>
-          <div class="log-weight">${l.weight} kg × ${l.reps} reps</div>
+          <div class="log-ex">${escapeHtml(l.exercise_name)}</div>
+          <div class="log-weight">${setSummary(l)}</div>
         </div>
-        <button class="log-del" onclick="deleteLog(${l.id})" title="Verwijder">✕</button>
+        <div class="log-actions">
+          <button class="icon-button" onclick="openLogEditor(${l.id})" title="Set aanpassen" aria-label="Set ${l.set_nr} aanpassen">✎</button>
+          <button class="icon-button" onclick="deleteLog(${l.id})" title="Set verwijderen" aria-label="Set ${l.set_nr} verwijderen">×</button>
+        </div>
       </div>
     `).join('');
   }
 
+  function renderWorkoutSets(logs) {
+    const exId = document.getElementById('exerciseSelect').value;
+    const sets = logs.filter(log => String(log.exercise_id) === exId);
+    document.getElementById('workoutSets').innerHTML = renderLogItems(sets);
+  }
+
+  function openLogEditor(id) {
+    const log = logsById.get(id);
+    if (!log) return;
+    editingLogId = id;
+    document.getElementById('logEditorTitle').textContent = `${log.exercise_name} · set ${log.set_nr} · ${log.date}`;
+    document.getElementById('editWeight').value = log.weight ?? '';
+    document.getElementById('editReps').value = log.reps ?? '';
+    document.getElementById('editNotes').value = log.notes || '';
+    document.getElementById('logEditor').showModal();
+  }
+
+  async function saveLogEdit(event) {
+    event.preventDefault();
+    const button = document.getElementById('saveLogEditButton');
+    if (button.disabled) return;
+    button.disabled = true;
+    try {
+      await api(`/api/logs/${editingLogId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weight: document.getElementById('editWeight').value === '' ? null : Number(document.getElementById('editWeight').value),
+          reps: document.getElementById('editReps').value === '' ? null : Number(document.getElementById('editReps').value),
+          notes: document.getElementById('editNotes').value
+        })
+      });
+      document.getElementById('logEditor').close();
+      await loadTodayLog();
+      loadStats();
+      loadProgressChart();
+      const request = exerciseRequest;
+      const previous = await api(`/api/logs/previous/${selectedExerciseId}`);
+      if (request === exerciseRequest) { previousSession = previous; updatePreviousSetHint(); }
+      toast('Set bijgewerkt');
+    } catch (error) { toast(error.message); }
+    finally { button.disabled = false; }
+  }
+
   async function deleteLog(id) {
-    await fetch(`/api/logs/${id}`, { method: 'DELETE' });
-    document.getElementById('logitem-' + id)?.remove();
-    loadStats();
-    toast('🗑️ Set verwijderd');
+    if (!confirm('Deze set verwijderen?')) return;
+    try {
+      await api(`/api/logs/${id}`, { method: 'DELETE' });
+      await loadTodayLog();
+      loadStats();
+      loadProgressChart();
+      toast('Set verwijderd');
+    } catch (error) { toast(error.message); }
   }
 
   // ================================================================
