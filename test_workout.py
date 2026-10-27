@@ -1,3 +1,5 @@
+import asyncio
+import io
 import sqlite3
 import tempfile
 import unittest
@@ -6,7 +8,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from pydantic import ValidationError
 
 import main
@@ -208,6 +210,63 @@ class WorkoutTests(unittest.TestCase):
         result = self.save()
         self.assertGreater(result["id"], 41)
         self.assertIsNone(main.get_today_logs()[-1]["weight"])
+
+    def import_csv(self, text):
+        upload = UploadFile(file=io.BytesIO(text.encode("utf-8-sig")), filename="fitdays.csv")
+        return asyncio.run(main.import_fitdays_csv(upload))
+
+    def test_fitdays_semicolon_units_and_all_metrics(self):
+        content = (
+            "Date;Weight;BMI;Body Fat;Subcutaneous fat;Heart Rate;Cardiac Index;Visceral Fat;Body Water;Skeletal Muscle;Muscle Mass;Bone Mass;Protein;BMR;Body age\n"
+            "17:36 Jan.27,2025;108.2kg;29.0;42.1%;30.0%;- -;- -;14.6;50.4%;38.8%;58.8kg;3.9kg;4.0%;1888.0kcal;27.0\n"
+        )
+        result = self.import_csv(content)
+        self.assertEqual((result["imported"], result["skipped"]), (1, 0))
+        row = main.get_bodyweight()[0]
+        self.assertEqual((row["date"], row["weight_kg"], row["body_fat_pct"], row["muscle_mass_kg"]),
+                         ("2025-01-27", 108.2, 42.1, 58.8))
+        self.assertEqual(len(row["metrics"]), 14)
+        self.assertEqual(row["metrics"]["bmr"]["value"], 1888)
+        self.assertIsNone(row["metrics"]["heart_rate"]["value"])
+        self.assertIsNone(row["metrics"]["cardiac_index"]["value"])
+        self.import_csv(content)
+        self.assertEqual(len(main.get_bodyweight()), 1)
+
+    def test_fitdays_decimal_comma_and_optional_missing_values(self):
+        self.import_csv("Date;Weight;Body Fat;Muscle Mass;Heart Rate\n27/01/2025;108,2 kg;42,1 %;58,8 kg;72bpm\n")
+        row = main.get_bodyweight()[0]
+        self.assertEqual((row["weight_kg"], row["body_fat_pct"]), (108.2, 42.1))
+        self.assertEqual(row["metrics"]["heart_rate"]["value"], 72)
+        result = self.import_csv("Date;Weight;Body Fat\n2025-01-28;108kg;- -\n")
+        self.assertEqual(result["skipped"], 0)
+        self.assertIsNone(main.get_bodyweight()[-1]["body_fat_pct"])
+
+    def test_fitdays_original_comma_csv_still_works(self):
+        self.import_csv("Date,Weight(kg),Body Fat(%),Muscle Mass(kg)\n2025/01/27,108.2,42.1,58.8\n")
+        self.assertEqual(main.get_bodyweight()[0]["weight_kg"], 108.2)
+
+    def test_fitdays_invalid_file_reports_error_without_writes(self):
+        for content in ("", "Bad;Headers\n1;2\n", "Date;Weight\nNot a date;108kg\n", "Date;Weight\n2025-01-27;unknown\n"):
+            with self.subTest(content=content), self.assertRaises(HTTPException) as error:
+                self.import_csv(content)
+            self.assertEqual(error.exception.status_code, 422)
+        self.assertEqual(main.get_bodyweight(), [])
+
+    def test_fitdays_skips_invalid_row_and_warns(self):
+        result = self.import_csv("Date;Weight;BMI\n2025-01-27;100kg;29\nbad;101kg;30\n2025-01-29;99kg;invalid\n")
+        self.assertEqual((result["imported"], result["skipped"]), (2, 1))
+        self.assertTrue(result["warnings"])
+        self.assertIsNone(main.get_bodyweight()[-1]["metrics"]["bmi"]["value"])
+
+    def test_bodyweight_latest_rows_and_existing_metrics_survive(self):
+        self.import_csv("Date;Weight;BMI\n2025-01-27;100kg;29\n2025-01-28;99kg;28\n")
+        self.assertEqual(main.get_bodyweight(limit=1)[0]["date"], "2025-01-28")
+        self.import_csv("Date;Weight\n2025-01-27;101kg\n")
+        row = main.get_bodyweight()[0]
+        self.assertEqual(row["weight_kg"], 101)
+        self.assertEqual(row["metrics"]["bmi"]["value"], 29)
+        main.init_db()
+        self.assertEqual(main.get_bodyweight()[0]["metrics"]["bmi"]["value"], 29)
 
 
 if __name__ == "__main__":
