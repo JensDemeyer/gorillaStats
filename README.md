@@ -11,7 +11,7 @@ voor verdere ontwikkeling; de desktopbrowser dient vooral voor lokale tests.
 - Rusttimer, dagoverzicht en progressiegrafieken.
 - Cardioregistratie en lichaamsgewicht, inclusief Fitdays CSV-import.
 - Afbeeldingen en GIF's uploaden per oefening.
-- XP, levels, twaalf achievements, weekdoelen en een activiteitenkalender.
+- XP, 25 rangen in vijf fases, zeventien achievements, weekdoelen en een activiteitenkalender.
 
 ## Tijdens Je Training
 
@@ -35,6 +35,25 @@ bijgewerkt voor optionele setgegevens. Bestaande logs blijven behouden.
 De backend gebruikt FastAPI en SQLite zonder ORM. De frontend bestaat uit een
 HTML-bestand met CSS en JavaScript, zonder buildstap.
 
+## Een Training Achteraf Registreren
+
+Kies in het trainingslog **Training toevoegen**, selecteer de trainingsdatum
+en vink de oefeningen aan die je hebt gedaan. Je kunt op schema filteren of
+een oefening zoeken, ook een oefening die inmiddels uit je schema is verwijderd.
+Het aantal sets, gewicht en de optionele reps blijven aanpasbaar.
+
+Het voorgestelde gewicht is per oefening het gemiddelde van de laatste drie
+eerdere sessiegemiddelden, strikt voor de gekozen datum. Elke sessie telt even
+zwaar mee, ongeacht het aantal sets. Zijn er maar een of twee sessies met
+bekende gewichten, dan worden die gebruikt; zonder historie blijft het gewicht
+leeg. Reps worden niet verzonnen.
+
+Automatische gewichten worden als **geschat** opgeslagen. Ze tellen mee voor je
+trainingsactiviteit, maar leveren geen PR op en worden niet opnieuw gebruikt
+om volgende schattingen te berekenen. Een handmatig ingevoerd gewicht is niet
+automatisch een schatting. Via het potlood kun je eerdere sets corrigeren,
+inclusief datum, oefening en de aanduiding geschat.
+
 ## Beloningen
 
 Beloningen worden uit bestaande logs berekend, ook voor historische data. Er zijn
@@ -45,7 +64,17 @@ geen extra tabellen, achtergrondtaken of dependencies nodig.
 	De huidige week mag nog bezig zijn; een gemiste volledige week breekt de streak.
 - Per dag: 10 XP per set voor de eerste 12 sets, 40 XP bij 3 sets,
 	30 XP bij 10 minuten cardio en 10 XP voor een weging.
-- Elke 500 XP is een level. Achievements geven eenmalige bonus-XP.
+- Elke 500 XP is een level, van Baby Gorillatje tot Ultra Alfa Gorilla op
+	level 25 (12.000 XP). Daarna blijft je totale XP oplopen, maar je rang is maximaal.
+- **Jouw evolutie** toont alle 25 rangen met hun beschrijvingen in een scrollbare
+	tijdlijn. De fasekeuze springt naar een fase; de doelknop brengt je terug naar
+	je huidige level. Toekomstige rangen blijven zichtbaar met de benodigde XP.
+- De vijf fases zijn De Wieg van het Regenwoud (1-5), De Puber Apen (6-10),
+	De Zilverruggelings (11-15), Opperbeesten (16-20) en Primal Mythologie (21-25).
+- Elke fase heeft een achievement bij het bereiken van het laatste level:
+	5, 10, 15, 20 en 25. Deze fasebadges geven geen extra XP, zodat er geen
+	zelfversterkende levelbeloningen ontstaan. De twaalf bestaande achievements
+	behouden hun bonus-XP. Bestaande logs en XP worden automatisch meegenomen.
 - Zwaarder trainen, meer afvallen en extra sets boven de daglimiet geven geen
 	extra XP. Verwijderde logs worden ook uit de beloningen verwijderd.
 - Geluid staat standaard uit en kan met de luidsprekerknop aan. De voorkeur
