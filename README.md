@@ -196,6 +196,44 @@ Zodat je Tailscale nooit meer handmatig hoeft aan te zetten: Android
 Instellingen > Netwerk > VPN > Tailscale (tandwiel) > **Altijd-aan VPN**.
 Sluit Tailscale ook uit van batterijoptimalisatie.
 
+## Android-app (APK)
+
+De map `android/` bevat een kleine native app (Kotlin, geen extra frameworks) die
+alleen de WebView rond de Pi-app vormt. Bij het openen zet ze Tailscale aan via
+de `AutomationActivity` van Tailscale (`com.tailscale.ipn.CONNECT_VPN`), laadt
+daarna de app en probeert het tot 30 seconden opnieuw zolang de VPN opstart. Sluit je de app met
+de terugknop, dan zet ze Tailscale weer uit, behalve als er al een VPN actief was
+voor je de app opende. Bestanden kiezen (CSV, afbeeldingen) werkt zoals in de browser.
+HTTPS is voor de app niet nodig; `http://<tailscale-ip>:8000` volstaat omdat het
+verkeer toch door de Tailscale-tunnel loopt.
+
+De app-code komt altijd van de Pi: na `git pull` op de Pi heb je geen nieuwe APK nodig.
+Een nieuwe APK is alleen nodig als de app zelf verandert (adres, icoon, naam, code in `android/`).
+
+Eenmalig instellen en bouwen op de pc (Android Studio is geïnstalleerd):
+
+1. Kopieer `android/gorillastats.properties.example` naar `android/gorillastats.properties`
+	en vul bij `url` het Tailscale-IP van de Pi in (te zien in de Tailscale-app of met
+	`tailscale ip -4` op de Pi). Uvicorn moet op dat IP luisteren, zoals bij **Raspberry Pi**.
+2. Open de map `android/` in Android Studio en laat Gradle synchroniseren, of bouw in PowerShell:
+	```powershell
+	cd android
+	.\gradlew.bat assembleRelease
+	```
+3. De APK staat in `android\app\build\outputs\apk\release\app-release.apk`.
+	Zet hem op je gsm (kabel, `adb install -r app-release.apk` of via een bestandsoverdracht)
+	en sta installeren uit onbekende bronnen toe voor die app.
+4. Open Tailscale op je gsm één keer en laat de VPN-toestemming goed: daarna kan GorillaStats
+	de VPN zonder tussenkomst starten.
+
+Bewaar `%USERPROFILE%\.android\debug.keystore`: de APK wordt ermee ondertekend en
+alleen met dezelfde sleutel kun je later bijwerken zonder de app te verwijderen.
+Een ander gsm-adres of Tailscale-IP vraagt enkel een nieuwe build. Zet `disconnectOnExit=false`
+in `gorillastats.properties` als Tailscale na het sluiten aan moet blijven.
+
+Op OnePlus kan agressief batterijbeheer de VPN-start of de app afsluiten; zet GorillaStats
+en Tailscale bij de batterij-instellingen op **Onbeperkt** als dat gebeurt.
+
 ## Data en afhankelijkheden
 
 De database `gym.db` wordt bij de eerste start in de projectmap aangemaakt,
