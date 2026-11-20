@@ -108,6 +108,10 @@ def init_db():
         cur.execute("ALTER TABLE logs ADD COLUMN is_estimated INTEGER NOT NULL DEFAULT 0")
     if "metrics_json" not in {row["name"] for row in cur.execute("PRAGMA table_info(bodyweight_logs)")}:
         cur.execute("ALTER TABLE bodyweight_logs ADD COLUMN metrics_json TEXT NOT NULL DEFAULT '{}'")
+    if "segments_json" not in {row["name"] for row in cur.execute("PRAGMA table_info(cardio_logs)")}:
+        cur.execute("ALTER TABLE cardio_logs ADD COLUMN segments_json TEXT")
+    cur.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+    cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('height_cm', '190')")
 
     # Seed default exercises once
     cur.execute("SELECT COUNT(*) FROM exercises")
@@ -195,13 +199,33 @@ class ExerciseCreate(BaseModel):
     notes: Optional[str] = None
 
 
+class CardioSegment(BaseModel):
+    minutes: float = Field(gt=0, le=600, allow_inf_nan=False)
+    speed_kmh: Optional[float] = Field(default=None, ge=0, le=40, allow_inf_nan=False)
+    incline_pct: Optional[float] = Field(default=None, ge=0, le=40, allow_inf_nan=False)
+    intensity: Optional[str] = None
+
+
 class CardioEntry(BaseModel):
     type: str
-    duration_minutes: float
-    distance_km: Optional[float] = None
-    calories: Optional[int] = None
+    duration_minutes: Optional[float] = Field(default=None, gt=0, le=1440, allow_inf_nan=False)
+    distance_km: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    calories: Optional[int] = Field(default=None, ge=0)
     notes: Optional[str] = None
     log_date: Optional[str] = None
+    segments: Optional[list[CardioSegment]] = Field(default=None, max_length=30)
+
+
+class CardioEstimate(BaseModel):
+    type: str
+    segments: list[CardioSegment] = Field(min_length=1, max_length=30)
+    log_date: Optional[str] = None
+
+
+class SettingsUpdate(BaseModel):
+    height_cm: Optional[float] = Field(default=None, ge=120, le=230, allow_inf_nan=False)
+    goal_weight_kg: Optional[float] = Field(default=None, ge=30, le=300, allow_inf_nan=False)
+    clear_goal: bool = False
 
 
 class BodyweightEntry(BaseModel):
@@ -750,28 +774,316 @@ def get_stats():
     }
 
 
+# --- Dashboard overview and exercise insight ---
+
+def active_day(sets: int, minutes: float) -> bool:
+    return sets >= 3 or minutes >= 10
+
+
+@app.get("/api/dashboard")
+def get_dashboard(weeks: int = 12):
+    weeks = max(4, min(weeks, 52))
+    today = date.today()
+    this_monday = today - timedelta(days=today.weekday())
+    first = this_monday - timedelta(weeks=weeks - 1)
+    conn = get_conn()
+    try:
+        days: dict = {}
+        for row in conn.execute(
+            """SELECT date, COUNT(*) AS sets, COALESCE(SUM(weight * reps), 0) AS tonnage
+               FROM logs WHERE date >= ? AND date <= ? GROUP BY date""", (first.isoformat(), today.isoformat())):
+            days[row["date"]] = {"sets": row["sets"], "tonnage": row["tonnage"], "minutes": 0.0, "kcal": 0}
+        for row in conn.execute(
+            """SELECT date, SUM(duration_minutes) AS minutes, COALESCE(SUM(calories), 0) AS kcal
+               FROM cardio_logs WHERE date >= ? AND date <= ? GROUP BY date""", (first.isoformat(), today.isoformat())):
+            day = days.setdefault(row["date"], {"sets": 0, "tonnage": 0, "minutes": 0.0, "kcal": 0})
+            day["minutes"], day["kcal"] = row["minutes"], row["kcal"]
+        body = body_summary(conn)
+    finally:
+        conn.close()
+
+    week_rows = []
+    calendar = []
+    for week in range(weeks):
+        start = first + timedelta(weeks=week)
+        entry = {"start": start.isoformat(), "active_days": 0, "sets": 0, "tonnage": 0.0, "cardio_minutes": 0.0,
+                 "kcal": 0, "current": start == this_monday}
+        for offset in range(7):
+            current = start + timedelta(days=offset)
+            if current > today:
+                break
+            data = days.get(current.isoformat(), {"sets": 0, "tonnage": 0, "minutes": 0.0, "kcal": 0})
+            active = active_day(data["sets"], data["minutes"])
+            entry["active_days"] += int(active)
+            entry["sets"] += data["sets"]
+            entry["tonnage"] += data["tonnage"]
+            entry["cardio_minutes"] += data["minutes"]
+            entry["kcal"] += data["kcal"]
+            calendar.append({"date": current.isoformat(), "active": active, "sets": data["sets"],
+                             "minutes": data["minutes"]})
+        entry["tonnage"] = round(entry["tonnage"])
+        entry["cardio_minutes"] = round(entry["cardio_minutes"])
+        week_rows.append(entry)
+
+    def month_total(start: date, end: date) -> dict:
+        selected = [calendar_day for calendar_day in calendar if start.isoformat() <= calendar_day["date"] <= end.isoformat()]
+        return {"active_days": sum(item["active"] for item in selected), "sets": sum(item["sets"] for item in selected)}
+
+    month_start = today.replace(day=1)
+    previous_end = month_start - timedelta(days=1)
+    recent = week_rows[-4:]
+    return {
+        "weeks": week_rows, "calendar": calendar, "body": body,
+        "month": {**month_total(month_start, today), "label": month_start.isoformat()},
+        "previous_month": {**month_total(previous_end.replace(day=1), previous_end), "label": previous_end.replace(day=1).isoformat()},
+        "average_active_days": round(sum(week["active_days"] for week in recent) / len(recent), 1),
+        "best_week_days": max(week["active_days"] for week in week_rows),
+    }
+
+
+@app.get("/api/exercises/{exercise_id}/insight")
+def get_exercise_insight(exercise_id: int):
+    """Recent real (non-estimated) sessions, used for stagnation and progress hints."""
+    today = date.today().isoformat()
+    conn = get_conn()
+    try:
+        sessions = [dict(row) for row in conn.execute(
+            """SELECT date, MAX(weight) AS max_weight, COUNT(*) AS sets,
+                      ROUND(AVG(reps), 1) AS avg_reps, MAX(reps) AS max_reps
+               FROM logs WHERE exercise_id = ? AND date < ? AND is_estimated = 0 AND weight IS NOT NULL
+               GROUP BY date ORDER BY date DESC LIMIT 12""", (exercise_id, today))]
+        best = conn.execute(
+            "SELECT MAX(weight) FROM logs WHERE exercise_id = ? AND is_estimated = 0", (exercise_id,)
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    stagnation = 0
+    climbing = 0
+    if sessions:
+        latest = sessions[0]["max_weight"]
+        for item in sessions:
+            if abs(item["max_weight"] - latest) > 0.01:
+                break
+            stagnation += 1
+        for newer, older in zip(sessions, sessions[1:]):
+            if newer["max_weight"] <= older["max_weight"] + 0.01:
+                break
+            climbing += 1
+    trend = "new"
+    if len(sessions) >= 2:
+        difference = sessions[0]["max_weight"] - sessions[1]["max_weight"]
+        trend = "up" if difference > 0.01 else "down" if difference < -0.01 else "same"
+    days_since = (date.today() - date.fromisoformat(sessions[0]["date"])).days if sessions else None
+    return {"sessions": sessions, "best_weight": best, "stagnation": stagnation, "climbing": climbing,
+            "trend": trend, "days_since": days_since}
+
+
+# --- Settings and body summary ---
+
+DEFAULT_HEIGHT_CM = 190.0
+HEALTHY_BMI = (18.5, 24.9)
+
+def bmi_category(bmi: float) -> str:
+    if bmi < 18.5:
+        return "Ondergewicht"
+    if bmi < 25:
+        return "Gezond gewicht"
+    if bmi < 30:
+        return "Overgewicht"
+    if bmi < 35:
+        return "Obesitas (klasse 1)"
+    if bmi < 40:
+        return "Obesitas (klasse 2)"
+    return "Obesitas (klasse 3)"
+
+
+def read_settings(conn: sqlite3.Connection) -> dict:
+    stored = {row["key"]: row["value"] for row in conn.execute("SELECT key, value FROM settings")}
+
+    def number(key: str) -> Optional[float]:
+        try:
+            return float(stored[key])
+        except (KeyError, ValueError):
+            return None
+
+    return {"height_cm": number("height_cm") or DEFAULT_HEIGHT_CM,
+            "goal_weight_kg": number("goal_weight_kg"), "goal_start_kg": number("goal_start_kg")}
+
+
+def weight_for(conn: sqlite3.Connection, on_date: Optional[str] = None) -> Optional[float]:
+    """Body weight on or before the date, else the earliest measurement."""
+    row = conn.execute(
+        "SELECT weight_kg FROM bodyweight_logs WHERE date <= ? ORDER BY date DESC LIMIT 1",
+        (on_date or date.today().isoformat(),),
+    ).fetchone() or conn.execute("SELECT weight_kg FROM bodyweight_logs ORDER BY date ASC LIMIT 1").fetchone()
+    return row["weight_kg"] if row else None
+
+
+def body_summary(conn: sqlite3.Connection) -> dict:
+    settings = read_settings(conn)
+    height_m = settings["height_cm"] / 100
+    low_kg = round(HEALTHY_BMI[0] * height_m ** 2, 1)
+    high_kg = round(HEALTHY_BMI[1] * height_m ** 2, 1)
+    summary = {**settings, "healthy_min_kg": low_kg, "healthy_max_kg": high_kg, "latest": None, "bmi": None,
+               "bmi_category": None, "to_healthy_kg": None, "goal_remaining_kg": None, "goal_progress": None}
+    row = conn.execute("SELECT date, weight_kg FROM bodyweight_logs ORDER BY date DESC LIMIT 1").fetchone()
+    if not row:
+        return summary
+    weight = row["weight_kg"]
+    bmi = round(weight / height_m ** 2, 1)
+    summary.update(latest={"date": row["date"], "weight_kg": weight}, bmi=bmi, bmi_category=bmi_category(bmi),
+                   to_healthy_kg=round(max(0.0, weight - high_kg), 1))
+    goal, start = settings["goal_weight_kg"], settings["goal_start_kg"]
+    if goal is not None:
+        summary["goal_remaining_kg"] = round(weight - goal, 1)
+        if start is not None and start != goal:
+            summary["goal_progress"] = round(min(1.0, max(0.0, (start - weight) / (start - goal))), 3)
+    return summary
+
+
+@app.get("/api/settings")
+def get_settings():
+    conn = get_conn()
+    try:
+        return body_summary(conn)
+    finally:
+        conn.close()
+
+
+@app.put("/api/settings")
+def update_settings(body: SettingsUpdate):
+    conn = get_conn()
+    try:
+        with conn:
+            if body.height_cm is not None:
+                conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('height_cm', ?)", (str(body.height_cm),))
+            if body.clear_goal:
+                conn.execute("DELETE FROM settings WHERE key IN ('goal_weight_kg', 'goal_start_kg')")
+            elif body.goal_weight_kg is not None:
+                previous = read_settings(conn)
+                conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('goal_weight_kg', ?)",
+                             (str(body.goal_weight_kg),))
+                current = weight_for(conn)
+                if previous["goal_weight_kg"] != body.goal_weight_kg or previous["goal_start_kg"] is None:
+                    if current is not None:
+                        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('goal_start_kg', ?)",
+                                     (str(current),))
+        return body_summary(conn)
+    finally:
+        conn.close()
+
+
 # --- Cardio ---
+
+CARDIO_MET = {  # (licht, matig, zwaar), Compendium of Physical Activities
+    "Loopband": (3.5, 5.0, 8.0), "Fietsen": (4.0, 6.8, 10.0), "Roeien": (4.8, 7.0, 8.5),
+    "Crosstrainer": (4.6, 5.5, 7.0), "Stairmaster": (6.0, 9.0, 11.5), "Zwemmen": (6.0, 8.3, 10.0),
+    "Andere": (4.0, 6.0, 8.0),
+}
+INTENSITY_INDEX = {"licht": 0, "matig": 1, "zwaar": 2}
+SPEED_TYPES = ("Loopband", "Fietsen")
+RUNNING_FROM_KMH = 7.0
+KCAL_PER_MET_KG_MINUTE = 3.5 * 5 / 1000  # 1 MET = 3.5 ml O2/kg/min, ~5 kcal per litre O2 (ACSM)
+
+
+def treadmill_met(speed_kmh: float, incline_pct: float) -> float:
+    """ACSM metabolic equations for walking and running on a treadmill."""
+    speed = speed_kmh * 1000 / 60
+    grade = (incline_pct or 0) / 100
+    if speed_kmh <= 0:
+        vo2 = 3.5
+    elif speed_kmh < RUNNING_FROM_KMH:
+        vo2 = 0.1 * speed + 1.8 * speed * grade + 3.5
+    else:
+        vo2 = 0.2 * speed + 0.9 * speed * grade + 3.5
+    return vo2 / 3.5
+
+
+def cycling_met(speed_kmh: float) -> float:
+    for limit, met in ((16, 4.0), (19, 6.8), (22.5, 8.0), (25.7, 10.0), (30.6, 12.0)):
+        if speed_kmh < limit:
+            return met
+    return 15.8
+
+
+def segment_met(kind: str, segment: CardioSegment) -> float:
+    if kind == "Loopband" and segment.speed_kmh is not None:
+        return treadmill_met(segment.speed_kmh, segment.incline_pct or 0)
+    if kind == "Fietsen" and segment.speed_kmh:
+        return cycling_met(segment.speed_kmh)
+    table = CARDIO_MET.get(kind, CARDIO_MET["Andere"])
+    return table[INTENSITY_INDEX.get((segment.intensity or "matig").lower(), 1)]
+
+
+def estimate_cardio(kind: str, segments: list, weight_kg: Optional[float]) -> dict:
+    minutes = sum(segment.minutes for segment in segments)
+    speeds = [segment.speed_kmh for segment in segments if segment.speed_kmh is not None]
+    distance = (round(sum((s.speed_kmh or 0) * s.minutes / 60 for s in segments), 2)
+                if kind in SPEED_TYPES and speeds else None)
+    details = []
+    for segment in segments:
+        met = segment_met(kind, segment)
+        kcal = met * weight_kg * segment.minutes * KCAL_PER_MET_KG_MINUTE if weight_kg else None
+        details.append({"minutes": segment.minutes, "met": round(met, 2), "kcal": None if kcal is None else round(kcal)})
+    total = sum(item["kcal"] for item in details) if weight_kg else None
+    average_met = sum(item["met"] * item["minutes"] for item in details) / minutes
+    return {"minutes": round(minutes, 2), "distance_km": distance, "kcal": total, "average_met": round(average_met, 2),
+            "weight_kg": weight_kg, "segments": details}
+
+
+def checked_date(value: Optional[str]) -> str:
+    try:
+        return date.fromisoformat(value).isoformat() if value else date.today().isoformat()
+    except ValueError:
+        raise HTTPException(422, "Ongeldige datum")
+
+
+@app.post("/api/cardio/estimate")
+def estimate_cardio_endpoint(entry: CardioEstimate):
+    conn = get_conn()
+    try:
+        return estimate_cardio(entry.type, entry.segments, weight_for(conn, checked_date(entry.log_date)))
+    finally:
+        conn.close()
+
 
 @app.post("/api/cardio", status_code=201)
 def save_cardio(entry: CardioEntry):
-    entry_date = entry.log_date or date.today().isoformat()
+    entry_date = checked_date(entry.log_date)
+    segments = entry.segments
+    duration = sum(segment.minutes for segment in segments) if segments else entry.duration_minutes
+    if not duration:
+        raise HTTPException(422, "Geef een duur of minstens een etappe op")
+    legacy_speed = None
+    if not segments and entry.distance_km and entry.type in SPEED_TYPES:
+        legacy_speed = min(40.0, entry.distance_km / (duration / 60))
     conn = get_conn()
-    conn.execute(
-        "INSERT INTO cardio_logs (date, type, duration_minutes, distance_km, calories, notes) VALUES (?, ?, ?, ?, ?, ?)",
-        (entry_date, entry.type, entry.duration_minutes, entry.distance_km, entry.calories, entry.notes or ""),
-    )
-    conn.commit()
-    conn.close()
-    return {"status": "ok"}
+    try:
+        weight = weight_for(conn, entry_date)
+        estimate = estimate_cardio(entry.type, segments or [CardioSegment(minutes=duration, speed_kmh=legacy_speed)], weight)
+        calories = entry.calories if entry.calories is not None else estimate["kcal"]
+        distance = entry.distance_km if entry.distance_km is not None else estimate["distance_km"]
+        with conn:
+            conn.execute(
+                """INSERT INTO cardio_logs (date, type, duration_minutes, distance_km, calories, notes, segments_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (entry_date, entry.type, duration, distance, calories, entry.notes or "",
+                 json.dumps([segment.model_dump() for segment in segments]) if segments else None),
+            )
+    finally:
+        conn.close()
+    return {"status": "ok", "calories": calories, "distance_km": distance, "weight_kg": weight}
 
 
 @app.get("/api/cardio")
 def get_cardio(limit: int = 30):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM cardio_logs ORDER BY date DESC, id DESC LIMIT ?", (limit,))
+    cur.execute("SELECT * FROM cardio_logs ORDER BY date DESC, id DESC LIMIT ?", (max(1, min(limit, 500)),))
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
+    for row in rows:
+        row["segments"] = json.loads(row.pop("segments_json") or "null")
     return rows
 
 
@@ -963,27 +1275,6 @@ async def import_fitdays_csv(file: UploadFile = File(...)):
 
 
 # --- Media upload ---
-
-@app.post("/api/exercises/{exercise_id}/media")
-async def upload_media(exercise_id: int, file: UploadFile = File(...)):
-    ext = os.path.splitext(file.filename or "")[1].lower()
-    allowed = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-    if ext not in allowed:
-        raise HTTPException(400, "Unsupported file type. Use jpg, png, gif, or webp.")
-
-    filename = f"ex_{exercise_id}{ext}"
-    dest = os.path.join(MEDIA_DIR, filename)
-    content = await file.read()
-    with open(dest, "wb") as f:
-        f.write(content)
-
-    media_url = f"/static/media/{filename}"
-    conn = get_conn()
-    conn.execute("UPDATE exercises SET media_url = ? WHERE id = ?", (media_url, exercise_id))
-    conn.commit()
-    conn.close()
-    return {"media_url": media_url}
-
 
 # --- Static files & SPA ---
 

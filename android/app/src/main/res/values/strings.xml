@@ -1,7 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">GorillaStats</string>
-    <string name="connecting">Verbinden met je Pi…</string>
-    <string name="unreachable">De Pi is niet bereikbaar. Controleer of Tailscale verbonden is.</string>
+    <string name="tagline">DJens\' gym tracker</string>
+
+    <string name="step_pending">Wacht…</string>
+    <string name="step_vpn_title">Tailscale</string>
+    <string name="step_vpn_active">Verbinding starten…</string>
+    <string name="step_vpn_done">Verbonden</string>
+    <string name="step_vpn_failed">Niet verbonden</string>
+    <string name="step_pi_title">Raspberry Pi connectie</string>
+    <string name="step_pi_active">Zoeken in je tailnet…</string>
+    <string name="step_pi_done">Bereikbaar</string>
+    <string name="step_pi_failed">Geen antwoord</string>
+    <string name="step_app_title">GorillaStats</string>
+    <string name="step_app_active">Laden… %1$d%%</string>
+    <string name="step_app_done">Klaar</string>
+    <string name="step_app_failed">Laden mislukt</string>
+
+    <string name="footer_time">%1$d s</string>
+    <string name="footer_slow">%1$d s · de eerste verbinding kan even duren</string>
+
+    <string name="error_vpn_title">Tailscale is niet verbonden</string>
+    <string name="error_vpn_message">Open Tailscale, geef de VPN-toestemming en probeer het opnieuw.</string>
+    <string name="error_pi_title">Je Pi antwoordt niet</string>
+    <string name="error_pi_message">Tailscale is verbonden, maar de Pi reageert niet. Staat hij aan en draait de app?</string>
+    <string name="error_app_title">De app kon niet laden</string>
+    <string name="error_app_message">De Pi is bereikbaar, maar de pagina laadde niet. Probeer het opnieuw.</string>
+
     <string name="retry">Opnieuw proberen</string>
+    <string name="open_tailscale">Tailscale openen</string>
 </resources>

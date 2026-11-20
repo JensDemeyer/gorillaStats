@@ -291,10 +291,14 @@ class PwaTests(unittest.TestCase):
         for url in re.findall(r"url\('(/static/[^']+)'\)", css):
             self.assertTrue((main.BASE_DIR / url.lstrip("/")).is_file(), url)
         worker = (main.STATIC_DIR / "sw.js").read_text(encoding="utf-8")
-        for url in re.findall(r"'(/[^']*)',", worker):
+        shell = re.search(r"const SHELL = \[(.*?)\];", worker, re.S).group(1)
+        for url in re.findall(r"'(/[^']*)'", shell):
             if url != "/":
                 self.assertTrue(
                     (main.BASE_DIR / url.lstrip("/")).is_file() or url in ("/manifest.webmanifest", "/logo.png"), url)
+        for url in re.findall(r'(?:src|href)="(/static/[^"]+)"', html):
+            self.assertTrue((main.BASE_DIR / url.lstrip("/")).is_file(), url)
+            self.assertIn(url, shell, f"{url} is not precached by the service worker")
 
 
 if __name__ == "__main__":

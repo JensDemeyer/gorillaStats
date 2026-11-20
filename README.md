@@ -9,31 +9,78 @@ voor verdere ontwikkeling; de desktopbrowser dient vooral voor lokale tests.
 - Push/Pull/Legs-routines en eigen oefeningen.
 - Sets, gewicht, herhalingen, notities, vorige sessie en PR-detectie.
 - Rusttimer, dagoverzicht en progressiegrafieken.
-- Cardioregistratie en lichaamsgewicht, inclusief Fitdays CSV-import.
-- Afbeeldingen en GIF's uploaden per oefening.
-- XP, 25 rangen in vijf fases, zeventien achievements, weekdoelen en een activiteitenkalender.
+- Cardio in etappes en lichaamsgewicht met BMI en doelgewicht, inclusief Fitdays CSV-import.
+- XP, 25 rangen in vijf fases met een eigen evolutieroute, zeventien achievements en weekdoelen.
+
+## Dashboard en evolutieroute
+
+- Bovenaan staat een compacte levelkaart met het beeld van je huidige fase.
+	Tik erop voor de **evolutieroute**: een kronkelpad door alle 25 levels met per fase
+	een afbeelding (`static/stages/`). Behaalde levels zijn groen, je huidige level pulseert
+	en toekomstige fases tonen een silhouet. Tik op een level of fase voor details.
+- Daaronder: weekstreak, doelen, tegels met trainingsdagen per maand, gemiddelde per week,
+	sets en cardio van deze week, een staafgrafiek van de laatste 12 weken
+	(trainingsdagen, sets, volume of cardio) met een heatmap, en een lichaamskaart met BMI.
+- Fase 3 en 4 gebruiken hetzelfde beeld (`alfa`); fase 4 krijgt een gouden gloed.
+	Voeg je later een apart beeld voor fase 4 toe, pas dan `STAGES` in `static/js/journey.js` aan.
+- Alle keuzelijsten openen als donkere jungle-lijst onderaan het scherm
+	(`static/js/select.js`); de gewone `<select>` blijft onzichtbaar bestaan.
 
 ## Tijdens Je Training
 
+- Kies bovenaan het schema (Push, Pull, Legs, ...) en daarna de oefening.
+- Gewicht en reps staan al ingevuld: de laatst gelogde set van vandaag, anders
+	dezelfde set van de vorige sessie. Met **−** en **+** pas je ze snel aan; tik op
+	de staplengte (±2,5) om te wisselen tussen 0,5, 1,25, 2,5 en 5 kg. Tik je in een
+	veld, dan wordt de waarde geselecteerd zodat je meteen kunt overtypen.
+- Na elke set krijg je een motivatiekaart (meer gewicht, meer reps, PR, oefening
+	klaar met knop naar de volgende) met de verdiende XP. De zinnen staan in
+	`static/js/motivation.js`.
+- Bij het openen van een oefening zie je een inzichtkaart op basis van je echte
+	sessies (geschatte sets tellen niet mee), bijvoorbeeld hoeveel sessies je op hetzelfde gewicht zit.
 - Gewicht en reps zijn optioneel: een set kan meteen worden opgeslagen.
 - Met het potlood bij een set kun je gewicht, reps en notities later aanvullen.
 	Dit kan tijdens de training of via het trainingslog met datumkeuze, ook op
 	een volgende dag. Ontbrekende waarden tellen niet mee als nulmetingen of PR's.
 - De rusttimer start alleen wanneer je zelf een tijd kiest.
 - Swipe naar links voor de volgende oefening, naar rechts voor de vorige.
-	De pijltjes doen hetzelfde. Nog niet opgeslagen invoer blijft tijdens deze
+	De pijltjes doen hetzelfde. Aangepaste, nog niet opgeslagen invoer blijft tijdens deze
 	browsersessie per oefening behouden.
-- De vorige sessie staat bij de oefening; bij elke nieuwe set zie je de
-	overeenkomstige set van de vorige keer. Tik op een vorige set om die over te nemen.
 - Via **Schema aanpassen** kun je Push, Pull, Legs en eigen schema's hernoemen,
 	oefeningen aanpassen, toevoegen, verwijderen en herordenen. Oefeningen die
 	je uit een schema verwijdert, behouden hun trainingshistoriek.
 
+## Gewicht, BMI en doel
+
+Op het tabblad **Gewicht** staat je BMI met een kleurenschaal, het gezonde
+gewichtsbereik voor jouw lengte (standaard 190 cm) en hoeveel kilo je nog moet
+afvallen (of aankomen) om bij BMI 24,9 (of 18,5) uit te komen. Je kunt je lengte en
+een doelgewicht instellen; de voortgang loopt van het gewicht op het moment dat je
+het doel instelde naar het doel. De grafiek toont het doel en de gezonde bovengrens,
+en je kunt ook de berekende BMI per meting kiezen.
+
+## Cardio in etappes
+
+Voeg per cardiosessie meerdere etappes toe, bijvoorbeeld 15 minuten op 5,5 km/u met
+15% helling gevolgd door 5 minuten op 5 km/u zonder helling. De kcal worden live berekend
+met je gewicht op die datum (de laatste weging op of voor de datum):
+
+- **Loopband:** de ACSM-vergelijkingen. Wandelen (< 7 km/u): VO2 = 0,1·v + 1,8·v·helling + 3,5.
+	Hardlopen (≥ 7 km/u): VO2 = 0,2·v + 0,9·v·helling + 3,5, met v in m/min en VO2 in
+	ml/kg/min. Daarna kcal = VO2 · gewicht · minuten · 5 / 1000.
+- **Fietsen:** MET-waarde uit de snelheid (Compendium of Physical Activities).
+- **Overige types:** MET-waarde uit het gekozen niveau (licht, matig, zwaar).
+
+Het resultaat is een schatting van het totale verbruik (inclusief rust). Lengte speelt
+geen rol in deze formules; die gebruik je voor BMI en doelen. Je kunt het getal altijd
+zelf aanpassen. Oude cardiologs zonder etappes blijven gewoon bestaan.
+
 De bestaande database wordt bij het starten automatisch en transactioneel
-bijgewerkt voor optionele setgegevens. Bestaande logs blijven behouden.
+bijgewerkt. Nieuw zijn een tabel `settings` (lengte, doelgewicht) en een kolom
+`segments_json` bij cardio. Bestaande logs blijven behouden.
 
 De backend gebruikt FastAPI en SQLite zonder ORM. De frontend bestaat uit een
-HTML-bestand met CSS en JavaScript, zonder buildstap.
+HTML-bestand met CSS en JavaScript (`static/css`, `static/js`), zonder buildstap.
 
 ## Fitdays CSV
 
@@ -178,7 +225,9 @@ De app is een installeerbare PWA: na installatie opent hij fullscreen vanaf het
 startscherm, zonder adresbalk. Chart.js en de lettertypes staan lokaal in
 `static/vendor/`, de app-shell wordt door de service worker (`static/sw.js`)
 gecachet. API-aanroepen gaan altijd rechtstreeks naar de Pi en worden nooit
-gecachet. Wijzig je `index.html` of de vendor-bestanden, verhoog dan `CACHE` in `sw.js`.
+gecachet. `index.html`, `static/js` en `static/css` worden eerst van de Pi gehaald, dus
+een `git pull` volstaat. Wijzig je de vendor-bestanden, iconen of fase-afbeeldingen,
+verhoog dan `CACHE` in `sw.js`.
 
 Chrome installeert alleen via HTTPS (of `localhost`), dus het Tailscale-IP over
 `http` volstaat niet. Tailscale kan dit gratis regelen:
@@ -199,9 +248,14 @@ Sluit Tailscale ook uit van batterijoptimalisatie.
 ## Android-app (APK)
 
 De map `android/` bevat een kleine native app (Kotlin, geen extra frameworks) die
-alleen de WebView rond de Pi-app vormt. Bij het openen zet ze Tailscale aan via
-de `AutomationActivity` van Tailscale (`com.tailscale.ipn.CONNECT_VPN`), laadt
-daarna de app en probeert het tot 30 seconden opnieuw zolang de VPN opstart. Sluit je de app met
+alleen de WebView rond de Pi-app vormt. Bij het openen zet ze Tailscale aan met de
+intent `com.tailscale.ipn.CONNECT_VPN`: eerst via de `AutomationActivity` (nieuwere
+Tailscale-versies), anders via de `IPNReceiver`-broadcast (oudere versies). Daarna wacht
+ze tot de Pi bereikbaar is (tot 30 seconden, de start wordt hooguit twee keer herhaald) en
+laadt de app. Tijdens het opstarten toont de app een jungle-scherm met je logo en drie
+stappen (Tailscale, je Pi, app laden) met live status, een voortgangsbalk en een teller.
+Lukt het niet, dan staat de mislukte stap in het rood met **Opnieuw proberen** en
+**Tailscale openen**. Sluit je de app met
 de terugknop, dan zet ze Tailscale weer uit, behalve als er al een VPN actief was
 voor je de app opende. Bestanden kiezen (CSV, afbeeldingen) werkt zoals in de browser.
 HTTPS is voor de app niet nodig; `http://<tailscale-ip>:8000` volstaat omdat het
@@ -237,12 +291,12 @@ en Tailscale bij de batterij-instellingen op **Onbeperkt** als dat gebeurt.
 ## Data en afhankelijkheden
 
 De database `gym.db` wordt bij de eerste start in de projectmap aangemaakt,
-met de standaardroutines. Uploads staan in `static/media/`. Beide zijn uitgesloten
-van Git. De locaties zijn onafhankelijk van de werkmap van het serverproces.
+met de standaardroutines. Die is uitgesloten van Git. De locatie is onafhankelijk
+van de werkmap van het serverproces.
 Lokale ontwikkeling gebruikt een eigen database, niet die op de Pi.
 
 Maak voor een eenvoudige bestandsbackup eerst de server stil en kopieer daarna
-`gym.db` en `static/media/`. Kopieer een actieve SQLite-database niet los van
+`gym.db`. Kopieer een actieve SQLite-database niet los van
 de WAL-bestanden.
 
 Chart.js en de lettertypes worden lokaal geserveerd; de interface heeft geen

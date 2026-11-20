@@ -12,6 +12,7 @@
   <link rel="icon" type="image/png" href="/logo.png">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
   <link rel="stylesheet" href="/static/vendor/fonts.css">
+  <link rel="stylesheet" href="/static/css/app.css">
   <script src="/static/vendor/chart.umd.min.js"></script>
 
   <style>
@@ -274,47 +275,6 @@
       padding: 4px 8px;
       font-size: 0.8rem;
       color: var(--text-dim);
-    }
-
-    /* ===== MEDIA BOX ===== */
-    #mediaBox {
-      position: relative;
-      border-radius: var(--radius-sm);
-      overflow: hidden;
-      background: var(--bg-deep);
-      border: 1px solid var(--border);
-      aspect-ratio: 16/7;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    #mediaBox img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-    #mediaPlaceholder {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      color: var(--text-muted);
-      font-size: 2.5rem;
-    }
-    #mediaPlaceholder p { font-size: 0.75rem; letter-spacing: 1px; text-transform: uppercase; }
-    .media-upload-btn {
-      position: absolute;
-      bottom: 8px;
-      right: 8px;
-      background: rgba(13,20,14,0.8);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 5px 10px;
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      cursor: pointer;
-      font-family: 'Barlow', sans-serif;
     }
 
     /* ===== REST TIMER ===== */
@@ -729,68 +689,54 @@
   ============================================================ -->
   <div class="page active" id="page-dashboard">
 
-    <section class="journey" aria-label="Jouw voortgang">
-      <div class="journey-heading">
-        <div class="level-sigil"><small>LEVEL</small><strong id="rewardLevel">1</strong></div>
-        <div class="journey-copy">
-          <div class="eyebrow" id="rewardPhase">Fase 1 · De Wieg van het Regenwoud</div>
-          <h1 id="rewardRank">Jouw volgende stap</h1>
-          <div class="text-muted" id="rewardTotalXp">0 XP totaal</div>
-        </div>
+    <button type="button" class="hero" id="levelHero" onclick="Journey.open()" aria-label="Open je evolutieroute">
+      <div class="hero-avatar-wrap">
+        <div class="hero-avatar"><img id="heroStage" class="stage-img" src="/static/stages/baby.webp" alt="" width="80" height="80"></div>
+        <span class="hero-level" id="rewardLevel" aria-label="Level">1</span>
       </div>
-      <p class="rank-description" id="rewardRankDescription"></p>
-      <div class="xp-caption"><span id="rewardLevelCaption">Op weg naar level 2</span><span id="rewardXpCaption">0 / 500 XP</span></div>
-      <progress class="reward-progress" id="rewardXpBar" max="500" value="0" aria-label="Voortgang naar volgend level"></progress>
+      <div class="hero-copy">
+        <div class="hero-eyebrow" id="rewardPhase">Fase 1 · De Wieg van het Regenwoud</div>
+        <div class="hero-rank" id="rewardRank">Jouw volgende stap</div>
+        <div class="hero-xp-line"><span id="rewardLevelCaption">Op weg naar level 2</span><span id="rewardXpCaption">0 / 500 XP</span></div>
+        <progress class="reward-progress" id="rewardXpBar" max="500" value="0" aria-label="Voortgang naar volgend level"></progress>
+        <div class="hero-cta">Bekijk je route · <span id="rewardTotalXp">0 XP</span> ›</div>
+      </div>
+    </button>
+
+    <section class="card week-card" aria-label="Deze week">
       <div class="week-summary"><strong id="rewardStreak">🔥 0 weken op rij</strong><span id="rewardWeekCount">0 / 3 actieve dagen</span></div>
       <div class="week-days" id="rewardWeek"></div>
     </section>
-
-    <details class="reward-section" id="levelJourney" open ontoggle="if (this.open && lastRewards) scrollJourneyToCurrent(false)">
-      <summary class="achievement-summary">Jouw evolutie <span id="journeyLevelCount">25 levels · 5 fases</span></summary>
-      <div class="journey-controls">
-        <div class="field">
-          <label for="journeyPhaseSelect">Fase</label>
-          <select id="journeyPhaseSelect" onchange="scrollJourneyToPhase()"></select>
-        </div>
-        <button class="icon-button" onclick="scrollJourneyToCurrent()" title="Naar mijn level" aria-label="Naar mijn level">◎</button>
-      </div>
-      <div class="level-roadmap" id="levelRoadmap" role="region" aria-label="Alle levels en fases" tabindex="0"></div>
-    </details>
 
     <section class="reward-section" aria-label="Doelen">
       <div class="reward-heading"><h2>Jouw volgende winst</h2><span id="rewardTodayXp">+0 XP vandaag</span></div>
       <div id="rewardQuests"></div>
     </section>
 
-    <section class="reward-section" aria-label="Activiteit afgelopen vier weken">
-      <div class="reward-heading"><h2>Je bouwt iets op</h2><span>Laatste 28 dagen</span></div>
-      <div class="activity-grid" id="rewardCalendar"></div>
-      <div class="activity-key"><span>4 weken geleden</span><span>Vandaag</span></div>
-    </section>
+    <div class="tile-grid" id="overviewTiles" aria-label="Overzicht"></div>
 
-    <details class="reward-section" open>
+    <div class="card">
+      <div class="card-title">📅 Afgelopen weken</div>
+      <div id="weekChartMetric" class="chip-row">
+        <span class="chip active" data-metric="active_days" onclick="Dashboard.selectWeekMetric(this)">Trainingsdagen</span>
+        <span class="chip" data-metric="sets" onclick="Dashboard.selectWeekMetric(this)">Sets</span>
+        <span class="chip" data-metric="tonnage" onclick="Dashboard.selectWeekMetric(this)">Volume</span>
+        <span class="chip" data-metric="cardio_minutes" onclick="Dashboard.selectWeekMetric(this)">Cardio</span>
+      </div>
+      <div class="chart-wrap tall"><canvas id="weeksChart"></canvas></div>
+      <div class="heat" id="heatmap" role="img" aria-label="Activiteit van de afgelopen 12 weken"></div>
+      <div class="heat-key"><span>12 weken geleden</span><span>Vandaag</span></div>
+    </div>
+
+    <button type="button" class="card body-card" id="bodyCard" onclick="showTab('bodyweight')" aria-label="Open lichaam en gewicht">
+      <div class="card-title">⚖️ Lichaam</div>
+      <div id="bodyCardContent"><div class="empty-state"><p>Nog geen weging.</p></div></div>
+    </button>
+
+    <details class="reward-section">
       <summary class="achievement-summary">Achievements <span id="rewardAchievementCount">0 / 17</span></summary>
       <div class="achievement-grid" id="rewardAchievements"></div>
     </details>
-
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-val" id="stat-tonnage">—</div>
-        <div class="stat-label">Tonnage Vandaag (kg)</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="stat-sessions">—</div>
-        <div class="stat-label">Sessies Totaal</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="stat-streak">—</div>
-        <div class="stat-label">Weekstreak 🔥</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val" id="stat-volume" style="font-size:1.4rem">—</div>
-        <div class="stat-label">All-Time Volume (kg)</div>
-      </div>
-    </div>
 
     <!-- PR Wall of Fame -->
     <div class="card">
@@ -835,17 +781,14 @@
 
     <!-- Exercise picker -->
     <div class="card">
-      <div class="card-title">🏋️ Oefening Selecteren</div>
+      <div class="card-title">🏋️ Training</div>
 
-      <div class="input-row" style="margin-bottom:12px">
-        <div class="field">
-          <label>Routine</label>
-          <select id="routineSelect" onchange="onRoutineChange()"></select>
-        </div>
-        <div class="field">
-          <label>Oefening</label>
-          <select id="exerciseSelect" onchange="onExerciseChange()"></select>
-        </div>
+      <div class="routine-chips" id="routineChips" role="tablist" aria-label="Schema"></div>
+      <select id="routineSelect" data-native hidden onchange="onRoutineChange()"></select>
+
+      <div class="field" style="margin-bottom:12px">
+        <label for="exerciseSelect">Oefening</label>
+        <select id="exerciseSelect" onchange="onExerciseChange()"></select>
       </div>
 
       <div class="exercise-nav">
@@ -854,15 +797,13 @@
         <button class="icon-button" id="nextExercise" onclick="navigateExercise(1)" title="Volgende oefening" aria-label="Volgende oefening">→</button>
       </div>
 
-      <!-- Media box -->
-      <div id="mediaBox">
-        <div id="mediaPlaceholder">
-          <div>🏋️</div>
-          <p>Geen media</p>
+      <div class="insight-card" id="exerciseInsight" hidden>
+        <div class="insight-emoji" id="insightEmoji" aria-hidden="true">🦍</div>
+        <div class="insight-copy">
+          <strong id="insightTitle"></strong>
+          <p id="insightLine"></p>
+          <div class="insight-chips" id="insightChips"></div>
         </div>
-        <img id="mediaImg" style="display:none" alt="Oefening demo">
-        <label class="media-upload-btn" for="mediaFileInput">📷 Upload</label>
-        <input type="file" id="mediaFileInput" accept="image/*,.gif" style="display:none" onchange="uploadMedia()">
       </div>
 
       <!-- Previous session -->
@@ -872,23 +813,33 @@
       </div>
 
       <!-- Set form -->
-      <div class="input-row">
-        <div class="field">
-          <label>Set Nr</label>
-          <input type="number" id="setNr" value="1" min="1" inputmode="numeric" oninput="updatePreviousSetHint()">
+      <div class="set-form">
+        <div class="set-head">
+          <button type="button" class="step-btn small" onclick="stepSetNr(-1)" aria-label="Vorig setnummer">−</button>
+          <label for="setNr">Set</label>
+          <input type="number" id="setNr" value="1" min="1" inputmode="numeric" onfocus="this.select()" oninput="onSetNrInput()">
+          <button type="button" class="step-btn small" onclick="stepSetNr(1)" aria-label="Volgend setnummer">+</button>
         </div>
-        <div class="field">
-          <label>Reps (optioneel)</label>
-          <input type="number" id="reps" placeholder="" min="1" inputmode="numeric">
+        <div class="step-grid">
+          <div class="step-field">
+            <div class="step-label"><label for="weight">Gewicht (kg)</label><button type="button" class="step-size" id="weightStepLabel" onclick="cycleWeightStep()" title="Staplengte wijzigen">±2,5</button></div>
+            <div class="stepper">
+              <button type="button" class="step-btn" onclick="stepField('weight', -1)" aria-label="Minder gewicht">−</button>
+              <input type="number" step="0.5" min="0" id="weight" placeholder="–" inputmode="decimal" onfocus="this.select()" oninput="markDirty()">
+              <button type="button" class="step-btn" onclick="stepField('weight', 1)" aria-label="Meer gewicht">+</button>
+            </div>
+          </div>
+          <div class="step-field">
+            <div class="step-label"><label for="reps">Reps</label><span class="step-size static">±1</span></div>
+            <div class="stepper">
+              <button type="button" class="step-btn" onclick="stepField('reps', -1)" aria-label="Minder reps">−</button>
+              <input type="number" id="reps" placeholder="–" min="1" inputmode="numeric" onfocus="this.select()" oninput="markDirty()">
+              <button type="button" class="step-btn" onclick="stepField('reps', 1)" aria-label="Meer reps">+</button>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="field">
-        <label>Gewicht (kg, optioneel)</label>
-        <input type="number" step="0.5" min="0" id="weight" placeholder="" inputmode="decimal">
-      </div>
-      <div class="field" style="margin-bottom:14px">
-        <label>Notities (optioneel)</label>
-        <input type="text" id="notes" placeholder="RPE 8, goeie set...">
+        <button type="button" class="notes-toggle" id="notesToggle" onclick="toggleNotes()">＋ Notitie</button>
+        <input type="text" id="notes" placeholder="RPE 8, goeie set..." hidden oninput="markDirty()">
       </div>
 
       <div id="previousSetHint" role="status" aria-live="polite"></div>
@@ -922,8 +873,8 @@
     <div class="card">
       <div class="card-title">🏃 Cardio Loggen</div>
 
-      <label>Type</label>
-      <select id="cardioType">
+      <label for="cardioType">Type</label>
+      <select id="cardioType" onchange="Cardio.onType()">
         <option>Loopband</option>
         <option>Roeien</option>
         <option>Stairmaster</option>
@@ -933,22 +884,17 @@
         <option>Andere</option>
       </select>
 
-      <div class="input-row">
-        <div class="field">
-          <label>Duur (min)</label>
-          <input type="number" id="cardioDur" placeholder="20" min="1" inputmode="decimal">
-        </div>
-        <div class="field">
-          <label>Afstand (km)</label>
-          <input type="number" id="cardioDist" placeholder="3.0" step="0.1" inputmode="decimal">
-        </div>
-      </div>
-      <div class="field" style="margin-bottom:14px">
-        <label>Calorieën (optioneel)</label>
-        <input type="number" id="cardioCal" placeholder="200" inputmode="numeric">
-      </div>
+      <div id="cardioSegments"></div>
+      <button type="button" class="btn btn-ghost btn-sm add-segment" onclick="Cardio.addSegment()">＋ Etappe toevoegen</button>
 
-      <button class="btn btn-gold" id="saveCardioButton" onclick="submitCardio()">🔥 CARDIO OPSLAAN</button>
+      <div class="cardio-total" id="cardioTotals" aria-live="polite"></div>
+      <div class="field" style="margin-bottom:8px">
+        <label for="cardioCal">Calorieën (kcal)</label>
+        <input type="number" id="cardioCal" placeholder="wordt berekend" inputmode="numeric" min="0">
+      </div>
+      <div class="text-muted cardio-note" id="cardioNote">Vul minstens één etappe in om je calorieën te zien.</div>
+
+      <button class="btn btn-gold" id="saveCardioButton" onclick="Cardio.save()">🔥 CARDIO OPSLAAN</button>
     </div>
 
     <!-- Cardio history -->
@@ -965,6 +911,25 @@
        BODYWEIGHT TAB
   ============================================================ -->
   <div class="page" id="page-bodyweight">
+
+    <div class="card">
+      <div class="card-title">🧬 BMI &amp; Doel</div>
+      <div id="bmiContent"></div>
+      <div class="input-row section-top">
+        <div class="field">
+          <label for="heightInput">Lengte (cm)</label>
+          <input type="number" id="heightInput" step="1" min="120" max="230" inputmode="decimal" value="190">
+        </div>
+        <div class="field">
+          <label for="goalInput">Doelgewicht (kg)</label>
+          <input type="number" id="goalInput" step="0.1" min="30" max="300" inputmode="decimal" placeholder="bv. 85">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-gold" id="saveProfileButton" onclick="Body.saveProfile()">💾 Opslaan</button>
+        <button class="btn btn-ghost" onclick="Body.clearGoal()">Doel wissen</button>
+      </div>
+    </div>
 
     <div class="card">
       <div class="card-title">⚖️ Gewicht Loggen</div>
@@ -1103,6 +1068,7 @@
 <div id="toast" role="status" aria-live="polite"></div>
 
 <dialog class="reward-dialog" id="rewardDialog" aria-labelledby="rewardTitle" aria-describedby="rewardDescription">
+  <div class="reward-stage" id="rewardStage" hidden></div>
   <span class="reward-emblem" id="rewardEmblem" aria-hidden="true">🏆</span>
   <div class="eyebrow">Een stap verder</div>
   <h2 id="rewardTitle">Goed bezig!</h2>
@@ -1111,6 +1077,13 @@
   <button class="btn btn-gold" onclick="document.getElementById('rewardDialog').close()">Mooi, verder!</button>
 </dialog>
 
+<script src="/static/js/select.js"></script>
+<script src="/static/js/motivation.js"></script>
+<script src="/static/js/coach.js"></script>
+<script src="/static/js/journey.js"></script>
+<script src="/static/js/body.js"></script>
+<script src="/static/js/dashboard.js"></script>
+<script src="/static/js/cardio.js"></script>
 <script>
   // ================================================================
   // STATE
@@ -1162,8 +1135,7 @@
     document.getElementById('rewardLevel').textContent = rewards.level;
     document.getElementById('rewardRank').textContent = rewards.rank;
     document.getElementById('rewardPhase').textContent = `Fase ${rewards.phase_number} · ${rewards.phase}`;
-    document.getElementById('rewardRankDescription').textContent = rewards.rank_description;
-    document.getElementById('rewardTotalXp').textContent = `${rewards.xp.toLocaleString('nl-NL')} XP totaal`;
+    document.getElementById('rewardTotalXp').textContent = `${rewards.xp.toLocaleString('nl-NL')} XP`;
     const nextRank = rewards.journey.flatMap(phase => phase.levels).find(rank => rank.level === rewards.level + 1);
     document.getElementById('rewardLevelCaption').textContent = rewards.is_max_level ? 'Hoogste rang bereikt' : `Volgende: ${nextRank.name} · level ${nextRank.level}`;
     document.getElementById('rewardXpCaption').textContent = rewards.is_max_level ? 'Voltooid' : `${rewards.level_xp} / ${rewards.next_level_xp} XP`;
@@ -1185,8 +1157,6 @@
           <progress class="reward-progress" value="${quest.progress}" max="${quest.target}" aria-label="${quest.title}"></progress>
         </div><span class="quest-count">${quest.progress}/${quest.target}</span>
       </div>`).join('');
-    document.getElementById('rewardCalendar').innerHTML = rewards.calendar.map(day => `
-      <span class="activity-cell${day.active ? ' active' : ''}" role="img" aria-label="${day.date}: ${day.active ? 'actief' : 'rustdag'}" title="${day.date}: ${day.active ? 'actief' : 'rustdag'}"></span>`).join('');
     const unlocked = rewards.achievements.filter(item => item.unlocked);
     document.getElementById('rewardAchievementCount').textContent = `${unlocked.length} / ${rewards.achievements.length} behaald`;
     document.getElementById('rewardAchievements').innerHTML = rewards.achievements.map(item => `
@@ -1196,25 +1166,30 @@
         <progress class="reward-progress" value="${item.progress}" max="${item.target}" aria-label="${item.title}"></progress>
         <div class="achievement-meta"><span>${item.unlocked ? '✓ Behaald' : `${item.progress}/${item.target}`}</span><span>${item.category === 'phase' ? 'Fasebadge' : `+${item.xp} XP`}</span></div>
       </article>`).join('');
-    renderLevelJourney(rewards);
+    Journey.update(rewards);
     if (celebrate && lastRewards) {
       const gained = Math.max(0, rewards.xp - lastRewards.xp);
       const newAchievements = unlocked.filter(item => !lastRewards.achievements.some(old => old.id === item.id && old.unlocked));
       const leveled = rewards.level > lastRewards.level;
+      const newPhase = rewards.phase_number > lastRewards.phase_number;
       const weekComplete = rewards.weekly_days >= 3 && lastRewards.weekly_days < 3;
       if (newAchievements.length || leveled || weekComplete) {
+        const stage = document.getElementById('rewardStage');
+        stage.hidden = !newPhase;
+        if (newPhase) stage.innerHTML = Journey.stageImage(rewards.phase_number);
+        document.getElementById('rewardEmblem').hidden = newPhase;
         document.getElementById('rewardEmblem').textContent = leveled ? '⚡' : newAchievements.length ? rewardIcons[newAchievements[0].icon] : '🔥';
-        document.getElementById('rewardTitle').textContent = leveled ? `Level ${rewards.level}: ${rewards.rank}` : newAchievements.length ? newAchievements[0].title : 'Weekdoel behaald!';
+        document.getElementById('rewardTitle').textContent = newPhase ? `Nieuwe fase: ${rewards.phase}` : leveled ? `Level ${rewards.level}: ${rewards.rank}` : newAchievements.length ? newAchievements[0].title : 'Weekdoel behaald!';
         document.getElementById('rewardDescription').textContent = newAchievements.length
           ? `Nieuw behaald: ${newAchievements.map(item => item.title).join(', ')}.`
-          : leveled ? `${rewards.rank}. Je blijft vooruitgaan.` : 'Drie actieve dagen. Je hebt je ritme gevonden.';
+          : newPhase ? `${rewards.rank}. Je evolueert!` : leveled ? `${rewards.rank}. Je blijft vooruitgaan.` : 'Drie actieve dagen. Je hebt je ritme gevonden.';
         document.getElementById('rewardEarnedXp').textContent = `+${gained} XP`;
         const dialog = document.getElementById('rewardDialog');
         if (!dialog.open) dialog.showModal();
         beep(660, 0.2, 0.1);
         setTimeout(() => beep(880, 0.2, 0.15), 120);
       } else if (gained > 0) {
-        toast(`Opgeslagen · +${gained} XP`);
+        Coach.addXp(gained, amount => toast(`Opgeslagen · +${amount} XP`));
       }
       if (gained > 0) {
         const bar = document.getElementById('rewardXpBar');
@@ -1223,54 +1198,6 @@
       }
     }
     lastRewards = rewards;
-  }
-
-  function renderLevelJourney(rewards) {
-    const roadmap = document.getElementById('levelRoadmap');
-    const previousLevel = roadmap.dataset.level;
-    const previousScroll = roadmap.scrollTop;
-    const phaseSelect = document.getElementById('journeyPhaseSelect');
-    const selectedPhase = phaseSelect.value || String(rewards.phase_number);
-    phaseSelect.innerHTML = rewards.journey.map(phase => `<option value="${phase.number}">Fase ${phase.number} · ${escapeHtml(phase.name)}</option>`).join('');
-    phaseSelect.value = selectedPhase;
-    document.getElementById('journeyLevelCount').textContent = `Level ${rewards.level} / ${rewards.max_level} · ${rewards.journey.length} fases`;
-    roadmap.innerHTML = rewards.journey.map(phase => `
-      <section class="level-phase" id="journey-phase-${phase.number}" aria-labelledby="journey-phase-title-${phase.number}">
-        <div class="level-phase-heading">
-          <small>FASE ${phase.number} · LEVEL ${phase.start_level}–${phase.end_level}</small>
-          <h3 id="journey-phase-title-${phase.number}">${escapeHtml(phase.name)}</h3>
-          <p>${escapeHtml(phase.description)}</p>
-          <span class="phase-achievement">${phase.completed ? '✓ Fase-achievement behaald' : `Fase-achievement bij level ${phase.end_level}`}</span>
-        </div>
-        <ol class="level-steps" start="${phase.start_level}">
-          ${phase.levels.map(rank => `<li class="level-step ${rank.current ? 'current' : rank.unlocked ? 'unlocked' : 'locked'}" id="journey-level-${rank.level}"${rank.current ? ' aria-current="step"' : ''}>
-            <span class="level-number" aria-label="Level ${rank.level}">${rank.level}</span>
-            <div class="level-copy"><strong>${escapeHtml(rank.name)}</strong><p>${escapeHtml(rank.description)}</p>
-              <span class="level-status">${rank.current ? 'Jouw huidige rang' : rank.unlocked ? '✓ Behaald' : `Nog ${(rank.xp_required - rewards.xp).toLocaleString('nl-NL')} XP`} · ${rank.xp_required.toLocaleString('nl-NL')} XP totaal</span>
-            </div>
-          </li>`).join('')}
-        </ol>
-      </section>`).join('');
-    roadmap.dataset.level = rewards.level;
-    if (previousLevel !== String(rewards.level)) requestAnimationFrame(() => scrollJourneyToCurrent(false, rewards));
-    else roadmap.scrollTop = previousScroll;
-  }
-
-  function scrollJourneyToElement(element, smooth) {
-    if (!element) return;
-    const roadmap = document.getElementById('levelRoadmap');
-    const top = element.getBoundingClientRect().top - roadmap.getBoundingClientRect().top + roadmap.scrollTop;
-    roadmap.scrollTo({ top: Math.max(0, top - 8), behavior: smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'instant' });
-  }
-
-  function scrollJourneyToPhase() {
-    scrollJourneyToElement(document.getElementById(`journey-phase-${document.getElementById('journeyPhaseSelect').value}`), true);
-  }
-
-  function scrollJourneyToCurrent(smooth = true, rewards = lastRewards) {
-    if (!rewards) return;
-    document.getElementById('journeyPhaseSelect').value = rewards.phase_number;
-    scrollJourneyToElement(document.getElementById(`journey-level-${rewards.level}`), smooth);
   }
 
   // ================================================================
@@ -1326,8 +1253,12 @@
       loadTodayLog();
       loadProgressChart();
     }
-    if (tab === 'cardio') loadCardioHistory();
+    if (tab === 'cardio') {
+      loadCardioHistory();
+      Cardio.refreshEstimate();
+    }
     if (tab === 'bodyweight') {
+      Body.load();
       loadBwChart();
     }
   }
@@ -1387,38 +1318,59 @@
     const exercises = routinesData[routine] || [];
     exSel.innerHTML = exercises.map(e => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('');
     if (exercises.some(ex => String(ex.id) === String(preferredExercise))) exSel.value = preferredExercise;
+    renderRoutineChips();
     await onExerciseChange();
   }
+
+  function renderRoutineChips() {
+    const current = document.getElementById('routineSelect').value;
+    document.getElementById('routineChips').innerHTML = Object.keys(routinesData).map(name =>
+      `<button type="button" class="routine-chip${name === current ? ' active' : ''}" role="tab" aria-selected="${name === current}" data-routine="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join('');
+  }
+
+  document.getElementById('routineChips').addEventListener('click', event => {
+    const chip = event.target.closest('[data-routine]');
+    const select = document.getElementById('routineSelect');
+    if (!chip || select.value === chip.dataset.routine) return;
+    select.value = chip.dataset.routine;
+    onRoutineChange();
+  });
 
   async function onExerciseChange() {
     const exId = document.getElementById('exerciseSelect').value;
     if (!exId) return;
-    if (selectedExerciseId) {
+    if (selectedExerciseId && fieldsDirty) {
       exerciseDrafts.set(selectedExerciseId, Object.fromEntries(['weight', 'reps', 'notes'].map(id => [id, document.getElementById(id).value])));
     }
     selectedExerciseId = exId;
     const request = ++exerciseRequest;
-    const draft = exerciseDrafts.get(exId) || {};
-    for (const id of ['weight', 'reps', 'notes']) document.getElementById(id).value = draft[id] || '';
+    resetSetFields();
     previousSession = null;
+    todaySets = [];
     document.getElementById('setNr').value = 1;
     document.getElementById('prevSession').style.display = 'none';
+    document.getElementById('exerciseInsight').hidden = true;
     document.getElementById('previousSetHint').textContent = 'Vorige sessie laden...';
     document.getElementById('workoutSets').innerHTML = '';
     document.getElementById('saveSetButton').disabled = true;
-    const routine = document.getElementById('routineSelect').value;
-    const exList = routinesData[routine] || [];
-    const ex = exList.find(e => String(e.id) === String(exId));
-    updateMediaBox(ex);
     updateExerciseNavigation();
     try {
-      const [previous, logs] = await Promise.all([api(`/api/logs/previous/${exId}`), api('/api/logs/today')]);
+      const [previous, logs, insight] = await Promise.all([
+        api(`/api/logs/previous/${exId}`), api('/api/logs/today'), api(`/api/exercises/${exId}/insight`).catch(() => null)]);
       if (request !== exerciseRequest) return;
       previousSession = previous;
       const sets = logs.filter(log => String(log.exercise_id) === exId);
       document.getElementById('setNr').value = Math.max(0, ...sets.map(set => set.set_nr)) + 1;
       renderWorkoutSets(logs);
+      renderInsight(insight);
       updatePreviousSetHint();
+      applyPrefill();
+      const draft = exerciseDrafts.get(exId);
+      if (draft) {
+        for (const id of ['weight', 'reps', 'notes']) document.getElementById(id).value = draft[id] || '';
+        if (draft.notes) showNotes(true);
+        fieldsDirty = true;
+      }
     } catch (error) {
       if (request === exerciseRequest) {
         document.getElementById('previousSetHint').textContent = 'Vorige sessie niet beschikbaar';
@@ -1427,6 +1379,88 @@
     } finally {
       if (request === exerciseRequest) document.getElementById('saveSetButton').disabled = false;
     }
+  }
+
+  function renderInsight(insight) {
+    const card = document.getElementById('exerciseInsight');
+    if (!insight) { card.hidden = true; return; }
+    const message = Motivation.exerciseInsight(insight);
+    document.getElementById('insightEmoji').textContent = message.emoji;
+    document.getElementById('insightTitle').textContent = message.title;
+    document.getElementById('insightLine').textContent = message.line;
+    document.getElementById('insightChips').innerHTML = message.chips.map(chip => `<span>${escapeHtml(chip)}</span>`).join('');
+    card.classList.toggle('warn', /^stagnation/.test(message.kind));
+    card.hidden = false;
+  }
+
+  // --- Set fields: prefill, steppers, notes ---
+  let fieldsDirty = false;
+  let todaySets = [];
+  let lastPrefill = { weight: null, reps: null };
+  const weightSteps = [0.5, 1.25, 2.5, 5];
+  let weightStep = 2.5;
+  try { weightStep = weightSteps.includes(Number(localStorage.getItem('gorilla-step'))) ? Number(localStorage.getItem('gorilla-step')) : 2.5; } catch (error) {}
+
+  function markDirty() { fieldsDirty = true; }
+
+  function resetSetFields() {
+    fieldsDirty = false;
+    lastPrefill = { weight: null, reps: null };
+    for (const id of ['weight', 'reps', 'notes']) document.getElementById(id).value = '';
+    showNotes(false);
+    updateWeightStepLabel();
+  }
+
+  function showNotes(visible) {
+    document.getElementById('notes').hidden = !visible;
+    document.getElementById('notesToggle').hidden = visible;
+  }
+
+  function toggleNotes() {
+    showNotes(true);
+    document.getElementById('notes').focus();
+  }
+
+  // Fills weight and reps: the last set logged today, else the same set number of the previous session.
+  function applyPrefill() {
+    if (fieldsDirty) return;
+    const setNr = Number(document.getElementById('setNr').value) || 1;
+    const lastToday = [...todaySets].reverse().find(set => set.weight != null || set.reps != null);
+    const sets = previousSession?.sets || [];
+    const source = lastToday || sets.find(set => set.set_nr === setNr) || sets[sets.length - 1] || null;
+    lastPrefill = { weight: source?.weight ?? null, reps: source?.reps ?? null };
+    document.getElementById('weight').value = lastPrefill.weight ?? '';
+    document.getElementById('reps').value = lastPrefill.reps ?? '';
+  }
+
+  function onSetNrInput() {
+    updatePreviousSetHint();
+    applyPrefill();
+  }
+
+  function stepSetNr(direction) {
+    const input = document.getElementById('setNr');
+    input.value = Math.max(1, (Number(input.value) || 1) + direction);
+    onSetNrInput();
+  }
+
+  function stepField(id, direction) {
+    const input = document.getElementById(id);
+    const step = id === 'weight' ? weightStep : 1;
+    const base = input.value === '' ? (lastPrefill[id] ?? 0) : Number(input.value);
+    input.value = Math.max(id === 'reps' ? 1 : 0, Math.round((base + direction * step) * 100) / 100);
+    markDirty();
+    if (navigator.vibrate) navigator.vibrate(8);
+  }
+
+  function updateWeightStepLabel() {
+    document.getElementById('weightStepLabel').textContent = `±${String(weightStep).replace('.', ',')}`;
+  }
+
+  function cycleWeightStep() {
+    weightStep = weightSteps[(weightSteps.indexOf(weightStep) + 1) % weightSteps.length];
+    try { localStorage.setItem('gorilla-step', String(weightStep)); } catch (error) {}
+    updateWeightStepLabel();
   }
 
   function updateExerciseNavigation() {
@@ -1459,32 +1493,15 @@
     if (Math.abs(dx) >= 60 && Math.abs(dx) > Math.abs(dy) * 1.5) navigateExercise(dx < 0 ? 1 : -1);
   }, { passive: true });
 
-  function updateMediaBox(ex) {
-    const img = document.getElementById('mediaImg');
-    const placeholder = document.getElementById('mediaPlaceholder');
-    if (ex && ex.media_url) {
-      img.src = ex.media_url;
-      img.style.display = 'block';
-      placeholder.style.display = 'none';
-    } else {
-      img.style.display = 'none';
-      placeholder.style.display = 'flex';
-    }
-    // Store exercise id for upload
-    document.getElementById('mediaFileInput').dataset.exId = ex ? ex.id : '';
-  }
-
   function updatePreviousSetHint() {
     const data = previousSession;
     const container = document.getElementById('prevSession');
     const chips = document.getElementById('prevSetChips');
     const currentSet = parseInt(document.getElementById('setNr').value) || 1;
-    document.getElementById('weight').placeholder = '';
-    document.getElementById('reps').placeholder = '';
 
     if (!data || !data.sets || data.sets.length === 0) {
       container.style.display = 'none';
-      document.getElementById('previousSetHint').textContent = 'Nog geen vorige sessie';
+      document.getElementById('previousSetHint').textContent = '';
       return;
     }
 
@@ -1494,22 +1511,14 @@
         Set ${s.set_nr}: ${setSummary(s)}
       </button>`
     ).join('');
-
     container.style.display = 'block';
-
-    const previous = data.sets.find(set => set.set_nr === currentSet);
-    document.getElementById('previousSetHint').textContent = previous
-      ? `Vorige keer · set ${currentSet}: ${setSummary(previous)}`
-      : `Vorige keer: ${data.sets.length} sets · geen set ${currentSet}`;
-    if (previous) {
-      document.getElementById('weight').placeholder = previous.weight ?? '';
-      document.getElementById('reps').placeholder = previous.reps ?? '';
-    }
+    document.getElementById('previousSetHint').textContent = '';
   }
 
   function prefillSet(weight, reps) {
     document.getElementById('weight').value = weight ?? '';
     document.getElementById('reps').value = reps ?? '';
+    markDirty();
   }
 
   // ================================================================
@@ -1542,19 +1551,27 @@
     const data = await res.json();
 
     exerciseDrafts.delete(String(exId));
+    const previousSet = previousSession?.sets?.find(set => set.set_nr === setNr) || null;
+    const feedback = Motivation.setFeedback({
+      weight, reps, previous: previousSet, isPr: data.is_pr, setNr, previousSetCount: previousSession?.sets?.length || 0 });
     if (request === exerciseRequest) {
+      todaySets.push({ set_nr: setNr, weight, reps });
+      fieldsDirty = false;
       document.getElementById('setNr').value = setNr + 1;
-      document.getElementById('weight').value = '';
-      document.getElementById('reps').value = '';
       document.getElementById('notes').value = '';
+      showNotes(false);
+      applyPrefill();
       updatePreviousSetHint();
     }
 
-    // PR celebration
+    // Feedback: PR banner, otherwise the coach card with a next-exercise shortcut after the last set
+    Coach.burst(button, data.is_pr ? ['🏆', '🔥', '⭐'] : ['💪', '🔥']);
     if (data.is_pr) {
-      showPRBanner(`${weight}kg × ${reps} reps`);
+      showPRBanner(`${weight}kg × ${reps} · ${feedback.line}`);
     } else {
-      toast(`✅ Set ${setNr} opgeslagen!`);
+      const select = document.getElementById('exerciseSelect');
+      const hasNext = feedback.kind === 'exerciseDone' && select.selectedIndex < select.options.length - 1;
+      Coach.show({ ...feedback, action: hasNext ? { label: 'Volgende oefening →', run: () => navigateExercise(1) } : null });
     }
 
     // Refresh today log & stats
@@ -1623,7 +1640,8 @@
     setTimeout(() => beep(880, 0.5, 0.1), 150);
     setTimeout(() => beep(1046, 0.6, 0.2), 300);
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-    toast('⏱️ Rust voorbij! Volgende set!', 3000);
+    const message = Motivation.pick('timerDone');
+    toast(`${message.emoji} ${message.title} ${message.line}`, 3000);
     setTimeout(stopTimer, 500);
   }
 
@@ -1644,31 +1662,6 @@
       osc.stop(ctx.currentTime + duration);
       osc.onended = () => ctx.close();
     } catch(e) {}
-  }
-
-  // ================================================================
-  // MEDIA UPLOAD
-  // ================================================================
-  async function uploadMedia() {
-    const input = document.getElementById('mediaFileInput');
-    const exId = input.dataset.exId;
-    if (!exId || !input.files[0]) return;
-
-    const formData = new FormData();
-    formData.append('file', input.files[0]);
-
-    const res = await fetch(`/api/exercises/${exId}/media`, { method: 'POST', body: formData });
-    const data = await res.json();
-
-    if (data.media_url) {
-      // Update local state
-      for (const routine of Object.keys(routinesData)) {
-        const ex = routinesData[routine].find(e => String(e.id) === String(exId));
-        if (ex) ex.media_url = data.media_url;
-      }
-      updateMediaBox({ id: exId, media_url: data.media_url });
-      toast('✅ Media geüpload!');
-    }
   }
 
   // ================================================================
@@ -1786,11 +1779,8 @@
     const data = await res.json();
     if (request !== statsRequest) return;
 
-    document.getElementById('stat-tonnage').textContent = fmt(data.tonnage_today, 0);
-    document.getElementById('stat-sessions').textContent = data.total_sessions;
-    document.getElementById('stat-streak').textContent = data.rewards.weekly_streak;
-    document.getElementById('stat-volume').textContent = fmt(data.total_volume, 0);
     renderRewards(data.rewards, celebrate);
+    Dashboard.load();
 
     const wall = document.getElementById('prWall');
     if (!data.recent_prs || data.recent_prs.length === 0) {
@@ -1853,6 +1843,7 @@
   function renderWorkoutSets(logs) {
     const exId = document.getElementById('exerciseSelect').value;
     const sets = logs.filter(log => String(log.exercise_id) === exId);
+    todaySets = sets;
     document.getElementById('workoutSets').innerHTML = renderLogItems(sets);
   }
 
@@ -2115,38 +2106,6 @@
   // ================================================================
   // CARDIO
   // ================================================================
-  async function submitCardio() {
-    const button = document.getElementById('saveCardioButton');
-    if (button.disabled) return;
-    const type = document.getElementById('cardioType').value;
-    const dur = parseFloat(document.getElementById('cardioDur').value);
-    const dist = parseFloat(document.getElementById('cardioDist').value) || null;
-    const cal = parseInt(document.getElementById('cardioCal').value) || null;
-
-    if (!dur) { toast('⚠️ Vul de duur in!'); return; }
-
-    button.disabled = true;
-    try {
-    const response = await fetch('/api/cardio', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, duration_minutes: dur, distance_km: dist, calories: cal })
-    });
-    if (!response.ok) throw new Error('Cardio opslaan mislukt. Probeer opnieuw.');
-
-    document.getElementById('cardioDur').value = '';
-    document.getElementById('cardioDist').value = '';
-    document.getElementById('cardioCal').value = '';
-    toast('✅ Cardio opgeslagen! 🔥');
-    loadCardioHistory();
-    await loadStats(true);
-    } catch (error) {
-      toast(error.message || 'Geen verbinding. Probeer opnieuw.');
-    } finally {
-      button.disabled = false;
-    }
-  }
-
   async function loadCardioHistory() {
     const res = await fetch('/api/cardio');
     const data = await res.json();
@@ -2158,8 +2117,9 @@
     container.innerHTML = data.map(c => `
       <div class="cardio-item">
         <div>
-          <div class="cardio-type">${c.type}</div>
+          <div class="cardio-type">${escapeHtml(c.type)}</div>
           <div class="cardio-meta">${c.date}${c.distance_km ? ' · ' + c.distance_km + ' km' : ''}${c.calories ? ' · ' + c.calories + ' kcal' : ''}</div>
+          ${c.segments?.length > 1 || (c.segments?.length === 1 && (c.segments[0].speed_kmh != null || c.segments[0].incline_pct)) ? `<div class="cardio-stages">${Cardio.summary(c)}</div>` : ''}
         </div>
         <div class="cardio-dur">${c.duration_minutes} min</div>
       </div>
@@ -2180,6 +2140,7 @@
 
     button.disabled = true;
     try {
+    const previousWeight = bodyweightData.length ? bodyweightData[bodyweightData.length - 1].weight_kg : null;
     const response = await fetch('/api/bodyweight', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2190,8 +2151,9 @@
     document.getElementById('bwKg').value = '';
     document.getElementById('bwFat').value = '';
     document.getElementById('bwMuscle').value = '';
-    toast('✅ Gewicht opgeslagen!');
+    Coach.show({ ...Motivation.weightFeedback(previousWeight, kg), duration: 4200 });
     loadBwChart();
+    Body.load();
     await loadStats(true);
     } catch (error) {
       toast(error.message || 'Geen verbinding. Probeer opnieuw.');
@@ -2239,6 +2201,7 @@
       for (const row of data) {
         for (const [key, metric] of Object.entries(row.metrics || {})) metrics.set(key, metric);
       }
+      metrics.set('bmi_calc', { label: 'BMI (berekend)', unit: '' });
       select.innerHTML = [...metrics].map(([key, metric]) => `<option value="${escapeHtml(key)}">${escapeHtml(metric.label)}${metric.unit ? ` (${escapeHtml(metric.unit)})` : ''}</option>`).join('');
       if (metrics.has(selected)) select.value = selected;
       renderBwChart();
@@ -2249,23 +2212,36 @@
 
   function renderBwChart() {
     const selected = document.getElementById('bwMetricSelect').value;
-    const metric = bodyweightData.map(row => row.metrics?.[selected]).find(Boolean) || { label: 'Gewicht', unit: 'kg' };
-    const values = bodyweightData.map(row => row.metrics?.[selected]?.value ?? (selected === 'weight_kg' ? row.weight_kg : null));
+    const body = Body.summary;
+    const heightM = (body?.height_cm || 190) / 100;
+    const calcBmi = selected === 'bmi_calc';
+    const metric = calcBmi ? { label: 'BMI (berekend)', unit: '' }
+      : bodyweightData.map(row => row.metrics?.[selected]).find(Boolean) || { label: 'Gewicht', unit: 'kg' };
+    const values = bodyweightData.map(row => calcBmi
+      ? Math.round(row.weight_kg / heightM ** 2 * 10) / 10
+      : row.metrics?.[selected]?.value ?? (selected === 'weight_kg' ? row.weight_kg : null));
     const valid = values.flatMap((value, index) => value == null ? [] : [{ value, date: bodyweightData[index].date }]);
     const summary = document.getElementById('bwMetricSummary');
     summary.textContent = valid.length
       ? `${valid.at(-1).value.toLocaleString('nl-NL')} ${metric.unit} · ${valid.at(-1).date} · ${valid.length} ${valid.length === 1 ? 'meting' : 'metingen'}`
       : 'Geen meetwaarden beschikbaar';
+    const labels = bodyweightData.map(row => row.date);
+    const datasets = [{ label: `${metric.label}${metric.unit ? ` (${metric.unit})` : ''}`, data: values,
+      borderColor: '#84bf82', backgroundColor: 'rgba(132,191,130,0.08)', borderWidth: 2,
+      fill: true, tension: 0.2, pointRadius: valid.length < 2 ? 5 : 3, spanGaps: false }];
+    const reference = (label, value, color) => datasets.push({ label, data: labels.map(() => value), borderColor: color,
+      borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false });
+    if (selected === 'weight_kg' && body) {
+      if (body.goal_weight_kg != null) reference(`Doel (${body.goal_weight_kg} kg)`, body.goal_weight_kg, '#e69500');
+      reference(`Gezond max (${body.healthy_max_kg} kg)`, body.healthy_max_kg, 'rgba(212,163,115,0.7)');
+    } else if (calcBmi) {
+      reference('Gezond max (24,9)', 24.9, 'rgba(212,163,115,0.7)');
+    }
     if (bwChartInst) bwChartInst.destroy();
     const ctx = document.getElementById('bwChart').getContext('2d');
     bwChartInst = new Chart(ctx, {
       type: 'line',
-      data: {
-        labels: bodyweightData.map(row => row.date),
-        datasets: [{ label: `${metric.label}${metric.unit ? ` (${metric.unit})` : ''}`, data: values,
-          borderColor: '#84bf82', backgroundColor: 'rgba(132,191,130,0.08)', borderWidth: 2,
-          fill: true, tension: 0.2, pointRadius: valid.length < 2 ? 5 : 3, spanGaps: false }]
-      },
+      data: { labels, datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,

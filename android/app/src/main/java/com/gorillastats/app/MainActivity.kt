@@ -2,6 +2,7 @@ package com.gorillastats.app
 
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -10,10 +11,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.view.Gravity
-import android.view.View
+import android.os.SystemClock
 import android.view.ViewGroup
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -21,26 +19,28 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Button
 import android.widget.FrameLayout
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import com.gorillastats.app.LoadingView.State
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
-    private lateinit var overlay: LinearLayout
-    private lateinit var statusText: TextView
-    private lateinit var retryButton: Button
+    private lateinit var loading: LoadingView
 
-    private val handler = Handler(Looper.getMainLooper())
-    private val appHost: String? = Uri.parse(BuildConfig.APP_URL).host
-    private var attempts = 0
+    private val worker = Executors.newSingleThreadExecutor()
+    private val appUri: Uri = Uri.parse(BuildConfig.APP_URL)
+    private val appHost: String? = appUri.host
+    private val appPort: Int = if (appUri.port != -1) appUri.port else if (appUri.scheme == "https") 443 else 80
+    private var generation = 0
+    private var loadFailures = 0
     private var failed = false
     private var vpnWasActive = false
     private var fileCallback: ValueCallback<Array<Uri>>? = null
@@ -61,42 +61,104 @@ class MainActivity : ComponentActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (webView.canGoBack()) webView.goBack() else finish()
+                if (!loading.isShowing && webView.canGoBack()) webView.goBack() else finish()
             }
         })
 
         // When a VPN is already active we assume it is Tailscale and leave it alone, also on exit.
         vpnWasActive = isVpnActive()
-        if (!vpnWasActive) connectTailscale()
-        load()
+        connectAndLoad()
     }
 
     override fun onDestroy() {
-        handler.removeCallbacksAndMessages(null)
+        generation++
+        worker.shutdownNow()
         if (isFinishing && BuildConfig.DISCONNECT_ON_EXIT && !vpnWasActive) disconnectTailscale()
         (webView.parent as? ViewGroup)?.removeView(webView)
         webView.destroy()
         super.onDestroy()
     }
 
-    private fun load() {
-        webView.loadUrl(BuildConfig.APP_URL)
+    // Starts Tailscale if needed, then waits (off the main thread) until the Pi accepts connections.
+    // Probing first avoids WebView hanging for minutes on a dead route before it reports an error.
+    private fun connectAndLoad() {
+        val run = ++generation
+        webView.stopLoading()
+        loading.reset()
+        val vpnUp = isVpnActive()
+        if (vpnUp) {
+            loading.setStep(STEP_VPN, State.DONE)
+            loading.setStep(STEP_PI, State.ACTIVE)
+        } else {
+            loading.setStep(STEP_VPN, State.ACTIVE)
+            connectTailscale()
+        }
+        worker.execute {
+            val start = SystemClock.elapsedRealtime()
+            var vpnShown = vpnUp
+            var resends = 0
+            while (run == generation) {
+                if (!vpnShown && isVpnActive()) {
+                    vpnShown = true
+                    ui(run) {
+                        loading.setStep(STEP_VPN, State.DONE)
+                        loading.setStep(STEP_PI, State.ACTIVE)
+                    }
+                }
+                if (isReachable()) {
+                    ui(run) {
+                        loading.setStep(STEP_VPN, State.DONE)
+                        loading.setStep(STEP_PI, State.DONE)
+                        loading.setStep(STEP_APP, State.ACTIVE)
+                        webView.loadUrl(BuildConfig.APP_URL)
+                    }
+                    return@execute
+                }
+                val elapsed = SystemClock.elapsedRealtime() - start
+                if (elapsed > CONNECT_TIMEOUT_MS) break
+                if (resends < MAX_RESENDS && elapsed > (resends + 1) * RESEND_AFTER_MS && !isVpnActive()) {
+                    resends++
+                    ui(run) { connectTailscale() }
+                }
+                try {
+                    Thread.sleep(PROBE_INTERVAL_MS)
+                } catch (_: InterruptedException) {
+                    return@execute
+                }
+            }
+            ui(run) { showConnectionFailure() }
+        }
+    }
+
+    private fun ui(run: Int, action: () -> Unit) = runOnUiThread { if (run == generation) action() }
+
+    private fun showConnectionFailure() {
+        if (!isVpnActive()) {
+            loading.setStep(STEP_VPN, State.FAILED)
+            loading.showError(R.string.error_vpn_title, R.string.error_vpn_message)
+        } else {
+            loading.setStep(STEP_VPN, State.DONE)
+            loading.setStep(STEP_PI, State.FAILED)
+            loading.showError(R.string.error_pi_title, R.string.error_pi_message)
+        }
+    }
+
+    private fun isReachable(): Boolean = try {
+        Socket().use { it.connect(InetSocketAddress(appHost, appPort), PROBE_TIMEOUT_MS) }
+        true
+    } catch (_: Exception) {
+        false
     }
 
     private fun onLoadFailed() {
         failed = true
-        if (attempts++ < MAX_ATTEMPTS) {
-            showOverlay(R.string.connecting, retry = false)
-            handler.postDelayed({ load() }, RETRY_DELAY_MS)
+        if (loadFailures++ < MAX_LOAD_FAILURES) {
+            connectAndLoad()
         } else {
-            showOverlay(R.string.unreachable, retry = true)
+            generation++
+            loading.setStep(STEP_APP, State.FAILED)
+            loading.showError(R.string.error_app_title, R.string.error_app_message)
         }
-    }
-
-    private fun showOverlay(message: Int, retry: Boolean) {
-        statusText.setText(message)
-        retryButton.visibility = if (retry) View.VISIBLE else View.GONE
-        overlay.visibility = View.VISIBLE
     }
 
     private fun isVpnActive(): Boolean {
@@ -105,26 +167,35 @@ class MainActivity : ComponentActivity() {
         return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
     }
 
-    // Tailscale's AutomationActivity is a transparent trampoline meant for external automation.
+    // Newer Tailscale builds have a transparent AutomationActivity for this; older builds only
+    // have the exported IPNReceiver broadcast, which is what we fall back to.
     private fun connectTailscale() {
         try {
-            startActivity(
-                Intent(ACTION_CONNECT).setClassName(TAILSCALE_PACKAGE, "$TAILSCALE_PACKAGE.AutomationActivity")
-            )
+            startActivity(Intent(ACTION_CONNECT).setComponent(TAILSCALE_ACTIVITY))
         } catch (_: Exception) {
-            // Tailscale missing or intent rejected: the app still opens and shows the retry screen.
+            sendTailscaleBroadcast(ACTION_CONNECT)
         }
     }
 
     // A broadcast works while we are being destroyed, unlike starting an activity.
-    private fun disconnectTailscale() {
+    private fun disconnectTailscale() = sendTailscaleBroadcast(ACTION_DISCONNECT)
+
+    private fun sendTailscaleBroadcast(action: String) {
         try {
-            sendBroadcast(Intent(ACTION_DISCONNECT).setPackage(TAILSCALE_PACKAGE))
+            sendBroadcast(Intent(action).setComponent(TAILSCALE_RECEIVER))
         } catch (_: Exception) {
         }
     }
 
-    private fun buildContent(): View {
+    private fun openTailscale() {
+        val launch = packageManager.getLaunchIntentForPackage(TAILSCALE_PACKAGE) ?: return
+        try {
+            startActivity(launch)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun buildContent(): FrameLayout {
         val root = FrameLayout(this).apply { setBackgroundColor(BACKGROUND) }
         webView = WebView(this).apply {
             setBackgroundColor(BACKGROUND)
@@ -132,32 +203,14 @@ class MainActivity : ComponentActivity() {
         }
         root.addView(webView, FrameLayout.LayoutParams(MATCH, MATCH))
 
-        statusText = TextView(this).apply {
-            setTextColor(TEXT)
-            textSize = 18f
-            gravity = Gravity.CENTER
-            setText(R.string.connecting)
-        }
-        retryButton = Button(this).apply {
-            setText(R.string.retry)
-            visibility = View.GONE
-            setOnClickListener {
-                attempts = 0
-                showOverlay(R.string.connecting, retry = false)
-                if (!isVpnActive()) connectTailscale()
-                load()
+        loading = LoadingView(this).apply {
+            onRetry = {
+                loadFailures = 0
+                connectAndLoad()
             }
+            onOpenTailscale = { openTailscale() }
         }
-        overlay = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(BACKGROUND)
-            setPadding(48, 48, 48, 48)
-            isClickable = true
-            addView(statusText, LinearLayout.LayoutParams(MATCH, WRAP).apply { bottomMargin = 32 })
-            addView(retryButton, LinearLayout.LayoutParams(WRAP, WRAP))
-        }
-        root.addView(overlay, FrameLayout.LayoutParams(MATCH, MATCH))
+        root.addView(loading, FrameLayout.LayoutParams(MATCH, MATCH))
 
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
@@ -182,9 +235,9 @@ class MainActivity : ComponentActivity() {
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
-                if (!failed) {
-                    attempts = 0
-                    overlay.visibility = View.GONE
+                if (!failed && loading.isShowing) {
+                    loadFailures = 0
+                    loading.complete()
                 }
             }
 
@@ -202,6 +255,10 @@ class MainActivity : ComponentActivity() {
             }
         }
         view.webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView, newProgress: Int) {
+                if (loading.isShowing) loading.setLoadPercent(newProgress)
+            }
+
             override fun onShowFileChooser(
                 webView: WebView,
                 callback: ValueCallback<Array<Uri>>,
@@ -224,11 +281,18 @@ class MainActivity : ComponentActivity() {
         const val TAILSCALE_PACKAGE = "com.tailscale.ipn"
         const val ACTION_CONNECT = "com.tailscale.ipn.CONNECT_VPN"
         const val ACTION_DISCONNECT = "com.tailscale.ipn.DISCONNECT_VPN"
-        const val MAX_ATTEMPTS = 20
-        const val RETRY_DELAY_MS = 1500L
+        val TAILSCALE_ACTIVITY = ComponentName(TAILSCALE_PACKAGE, "$TAILSCALE_PACKAGE.AutomationActivity")
+        val TAILSCALE_RECEIVER = ComponentName(TAILSCALE_PACKAGE, "$TAILSCALE_PACKAGE.IPNReceiver")
+        const val STEP_VPN = 0
+        const val STEP_PI = 1
+        const val STEP_APP = 2
+        const val CONNECT_TIMEOUT_MS = 30_000L
+        const val RESEND_AFTER_MS = 8_000L
+        const val MAX_RESENDS = 2
+        const val PROBE_INTERVAL_MS = 1_000L
+        const val PROBE_TIMEOUT_MS = 1_500
+        const val MAX_LOAD_FAILURES = 2
         const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
-        const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
         val BACKGROUND = Color.parseColor("#0D140E")
-        val TEXT = Color.parseColor("#F8F9FA")
     }
 }
