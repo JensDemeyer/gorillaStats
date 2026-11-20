@@ -172,6 +172,30 @@ Terugdraaien kan met `venv/bin/python import_dates.py --rollback --apply`
 (verwijdert alleen geïmporteerde sets en sessies), of door de backup terug te zetten.
 Tests: `.\venv\Scripts\python.exe -m unittest test_import_dates -v`.
 
+## Installeren op Android (PWA)
+
+De app is een installeerbare PWA: na installatie opent hij fullscreen vanaf het
+startscherm, zonder adresbalk. Chart.js en de lettertypes staan lokaal in
+`static/vendor/`, de app-shell wordt door de service worker (`static/sw.js`)
+gecachet. API-aanroepen gaan altijd rechtstreeks naar de Pi en worden nooit
+gecachet. Wijzig je `index.html` of de vendor-bestanden, verhoog dan `CACHE` in `sw.js`.
+
+Chrome installeert alleen via HTTPS (of `localhost`), dus het Tailscale-IP over
+`http` volstaat niet. Tailscale kan dit gratis regelen:
+
+1. Zet in de Tailscale admin console **MagicDNS** en **HTTPS Certificates** aan.
+2. Laat uvicorn op de Pi enkel lokaal luisteren (`--host 127.0.0.1 --port 8000`,
+	pas dit aan in de systemd-service en herstart die).
+3. Publiceer hem binnen je tailnet (geen Funnel, de app heeft geen authenticatie):
+	`sudo tailscale serve --bg --https=443 http://127.0.0.1:8000`.
+	Controleer de syntax met `tailscale serve --help`, die verschilt per versie.
+4. Open `https://<pi-naam>.<tailnet>.ts.net` in Chrome op je gsm en kies
+	**App installeren**.
+
+Zodat je Tailscale nooit meer handmatig hoeft aan te zetten: Android
+Instellingen > Netwerk > VPN > Tailscale (tandwiel) > **Altijd-aan VPN**.
+Sluit Tailscale ook uit van batterijoptimalisatie.
+
 ## Data en afhankelijkheden
 
 De database `gym.db` wordt bij de eerste start in de projectmap aangemaakt,
@@ -183,5 +207,5 @@ Maak voor een eenvoudige bestandsbackup eerst de server stil en kopieer daarna
 `gym.db` en `static/media/`. Kopieer een actieve SQLite-database niet los van
 de WAL-bestanden.
 
-Chart.js en Google Fonts worden momenteel extern geladen. Een werkende
-Tailscale-verbinding betekent dus niet dat de interface volledig offline werkt.
+Chart.js en de lettertypes worden lokaal geserveerd; de interface heeft geen
+externe verbindingen meer nodig.

@@ -1,5 +1,7 @@
 import asyncio
 import io
+import json
+import re
 import sqlite3
 import tempfile
 import unittest
@@ -267,6 +269,32 @@ class WorkoutTests(unittest.TestCase):
         self.assertEqual(row["metrics"]["bmi"]["value"], 29)
         main.init_db()
         self.assertEqual(main.get_bodyweight()[0]["metrics"]["bmi"]["value"], 29)
+
+
+class PwaTests(unittest.TestCase):
+    def test_manifest_and_service_worker_are_served_from_root(self):
+        manifest = main.serve_manifest()
+        self.assertEqual(manifest.media_type, "application/manifest+json")
+        data = json.loads(Path(manifest.path).read_text(encoding="utf-8"))
+        self.assertEqual(data["display"], "standalone")
+        for icon in data["icons"]:
+            self.assertTrue((main.BASE_DIR / icon["src"].lstrip("/")).is_file(), icon["src"])
+        worker = main.serve_service_worker()
+        self.assertEqual(worker.headers["cache-control"], "no-cache")
+        self.assertTrue(Path(worker.path).is_file())
+
+    def test_index_uses_only_local_assets_and_precached_files_exist(self):
+        html = (main.STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        self.assertIn('rel="manifest"', html)
+        self.assertNotRegex(html, r'(src|href)="https?://')
+        css = (main.STATIC_DIR / "vendor" / "fonts.css").read_text(encoding="utf-8")
+        for url in re.findall(r"url\('(/static/[^']+)'\)", css):
+            self.assertTrue((main.BASE_DIR / url.lstrip("/")).is_file(), url)
+        worker = (main.STATIC_DIR / "sw.js").read_text(encoding="utf-8")
+        for url in re.findall(r"'(/[^']*)',", worker):
+            if url != "/":
+                self.assertTrue(
+                    (main.BASE_DIR / url.lstrip("/")).is_file() or url in ("/manifest.webmanifest", "/logo.png"), url)
 
 
 if __name__ == "__main__":
