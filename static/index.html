@@ -123,6 +123,10 @@
     main { padding: 16px; max-width: 600px; margin: 0 auto; }
     .page { display: none; }
     .page.active { display: block; }
+    .page.from-right { animation: page-from-right .22s ease-out; }
+    .page.from-left { animation: page-from-left .22s ease-out; }
+    @keyframes page-from-right { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: none; } }
+    @keyframes page-from-left { from { opacity: 0; transform: translateX(-36px); } to { opacity: 1; transform: none; } }
 
     /* ===== CARDS ===== */
     .card {
@@ -1230,11 +1234,22 @@
   // ================================================================
   // TABS
   // ================================================================
+  const TAB_ORDER = ['dashboard', 'workout', 'cardio', 'bodyweight'];
+
+  function currentTab() {
+    return TAB_ORDER.find(tab => document.getElementById('page-' + tab).classList.contains('active')) || 'dashboard';
+  }
+
   function showTab(tab) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const direction = Math.sign(TAB_ORDER.indexOf(tab) - TAB_ORDER.indexOf(currentTab()));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active', 'from-left', 'from-right'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('page-' + tab).classList.add('active');
+    const page = document.getElementById('page-' + tab);
+    page.classList.add('active');
+    if (direction) page.classList.add(direction > 0 ? 'from-right' : 'from-left');
     document.getElementById('tab-' + tab).classList.add('active');
+    document.getElementById('tab-' + tab).scrollIntoView({ block: 'nearest', inline: 'center' });
+    window.scrollTo(0, 0);
 
     if (tab === 'dashboard') {
       loadStats();
@@ -1249,6 +1264,32 @@
       Body.load();
       loadBwChart();
     }
+  }
+
+  // Swipe left/right to change tab. On the Training tab the content swipe changes exercise instead
+  // (see below), so there you swipe on the tab bar. Charts, inputs and scrollable rows never start a swipe.
+  let tabSwipe = null;
+  const tabSwipeIgnore = 'input, select, textarea, canvas, .routine-chips, .jsel, .heat';
+
+  function swipeTab(direction) {
+    const next = TAB_ORDER[TAB_ORDER.indexOf(currentTab()) + direction];
+    if (next) showTab(next);
+  }
+
+  for (const [area, allowOnWorkout] of [[document.querySelector('main'), false], [document.querySelector('header'), true]]) {
+    area.addEventListener('touchstart', event => {
+      const blocked = event.touches.length !== 1 || event.target.closest(tabSwipeIgnore)
+        || (!allowOnWorkout && currentTab() === 'workout');
+      tabSwipe = blocked ? null : { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    }, { passive: true });
+    area.addEventListener('touchcancel', () => { tabSwipe = null; }, { passive: true });
+    area.addEventListener('touchend', event => {
+      if (!tabSwipe) return;
+      const dx = event.changedTouches[0].clientX - tabSwipe.x;
+      const dy = event.changedTouches[0].clientY - tabSwipe.y;
+      tabSwipe = null;
+      if (Math.abs(dx) >= 70 && Math.abs(dx) > Math.abs(dy) * 1.6) swipeTab(dx < 0 ? 1 : -1);
+    }, { passive: true });
   }
 
   // ================================================================
