@@ -1,6 +1,6 @@
 // Bump the version whenever the vendored assets, icons or stage images change.
 // App code (index.html, /static/js, /static/css) is network-first, so a git pull is enough.
-const CACHE = 'gorillastats-shell-v2';
+const CACHE = 'gorillastats-shell-v3';
 const SHELL = [
   '/',
   '/manifest.webmanifest',
@@ -19,6 +19,7 @@ const SHELL = [
   '/static/js/cardio.js',
   '/static/stages/baby.webp',
   '/static/stages/puber.webp',
+  '/static/stages/zilverrug.webp',
   '/static/stages/alfa.webp',
   '/static/stages/ultra-alfa.webp',
 ];

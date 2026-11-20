@@ -312,3 +312,9 @@
 .cardio-note { margin-bottom: 14px; font-size: .78rem; }
 .cardio-stages { margin-top: 4px; color: var(--text-dim); font-size: .78rem; line-height: 1.5; }
 .reward-stage { width: 170px; height: 170px; margin: 0 auto 4px; }
+.notice { grid-column: 1 / -1; padding: 14px 16px; background: rgba(230,57,70,.12); border: 1px solid var(--blood-dark); border-radius: 12px; }
+.notice strong { display: block; color: var(--blood); font: 800 1.1rem 'Barlow Condensed', sans-serif; }
+.notice span { display: block; margin-top: 4px; color: var(--text-dim); font-size: .85rem; line-height: 1.5; }
+.notice code { padding: 1px 5px; color: var(--gold); background: var(--bg-deep); border-radius: 4px; }
+.editor-chips { margin-bottom: 14px; flex-wrap: wrap; }
+.routine-chip.new { color: var(--gold); border-style: dashed; }

@@ -356,6 +356,24 @@ def update_routine(routine: str, body: RoutineUpdate):
     return {"status": "ok"}
 
 
+@app.post("/api/routines", status_code=201)
+def create_routine(body: RoutineUpdate):
+    name = body.name.strip()
+    if not name or any(not item.name.strip() for item in body.exercises):
+        raise HTTPException(422, "Namen mogen niet leeg zijn")
+    conn = get_conn()
+    try:
+        with conn:
+            if conn.execute("SELECT 1 FROM exercises WHERE routine = ? AND active = 1", (name,)).fetchone():
+                raise HTTPException(409, "Dit schema bestaat al")
+            for position, item in enumerate(body.exercises):
+                conn.execute("INSERT INTO exercises (routine, name, sort_order) VALUES (?, ?, ?)",
+                             (name, item.name.strip(), position))
+    finally:
+        conn.close()
+    return {"status": "ok", "name": name}
+
+
 # --- Logs ---
 
 def workout_suggestions(conn: sqlite3.Connection, log_date: date):

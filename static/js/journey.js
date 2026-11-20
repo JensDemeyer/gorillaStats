@@ -3,8 +3,8 @@ const Journey = (() => {
   const STAGES = {
     1: { image: 'baby', label: 'Baby-gorilla' },
     2: { image: 'puber', label: 'Puber-aap' },
-    3: { image: 'alfa', label: 'Zilverrug' },
-    4: { image: 'alfa', label: 'Opperbeest', aura: true },
+    3: { image: 'zilverrug', label: 'Zilverrug' },
+    4: { image: 'alfa', label: 'Opperbeest' },
     5: { image: 'ultra-alfa', label: 'Ultra Alfa' },
   };
   const ROW = 96;

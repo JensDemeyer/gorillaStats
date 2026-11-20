@@ -100,6 +100,19 @@ class BackendFeatureTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             main.save_cardio(main.CardioEntry(type="Roeien", duration_minutes=5, log_date="gisteren"))
 
+    # --- routines ---
+
+    def test_new_routine_is_created_in_one_step_and_cannot_duplicate(self):
+        result = main.create_routine(main.RoutineUpdate(name="Armen", exercises=[
+            main.RoutineExercise(name="Curl"), main.RoutineExercise(name="Dips")]))
+        self.assertEqual(result["name"], "Armen")
+        self.assertEqual([item["name"] for item in main.get_routines()["Armen"]], ["Curl", "Dips"])
+        with self.assertRaises(HTTPException) as error:
+            main.create_routine(main.RoutineUpdate(name="Armen", exercises=[main.RoutineExercise(name="Curl")]))
+        self.assertEqual(error.exception.status_code, 409)
+        with self.assertRaises(HTTPException):
+            main.create_routine(main.RoutineUpdate(name="  ", exercises=[main.RoutineExercise(name="Curl")]))
+
     # --- dashboard and insight ---
 
     def test_dashboard_counts_active_days_per_week(self):

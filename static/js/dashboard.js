@@ -16,7 +16,12 @@ const Dashboard = (() => {
       data = next;
       render();
     } catch (error) {
-      // The rest of the dashboard keeps working without the overview.
+      const outdated = error.status === 404;
+      document.getElementById('overviewTiles').innerHTML = `<div class="notice" role="alert">
+        <strong>${outdated ? 'Server draait nog een oude versie' : 'Overzicht kon niet laden'}</strong>
+        <span>${outdated
+          ? 'Na een <code>git pull</code> moet de server op de Pi opnieuw starten (herstart de service of de Pi) voor de nieuwe grafieken en berekeningen.'
+          : 'Controleer de verbinding en probeer het opnieuw.'}</span></div>`;
     }
   }
 

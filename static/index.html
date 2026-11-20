@@ -817,7 +817,7 @@
         <div class="set-head">
           <button type="button" class="step-btn small" onclick="stepSetNr(-1)" aria-label="Vorig setnummer">−</button>
           <label for="setNr">Set</label>
-          <input type="number" id="setNr" value="1" min="1" inputmode="numeric" onfocus="this.select()" oninput="onSetNrInput()">
+          <input type="number" id="setNr" value="1" min="1" inputmode="numeric" oninput="onSetNrInput()">
           <button type="button" class="step-btn small" onclick="stepSetNr(1)" aria-label="Volgend setnummer">+</button>
         </div>
         <div class="step-grid">
@@ -825,7 +825,7 @@
             <div class="step-label"><label for="weight">Gewicht (kg)</label><button type="button" class="step-size" id="weightStepLabel" onclick="cycleWeightStep()" title="Staplengte wijzigen">±2,5</button></div>
             <div class="stepper">
               <button type="button" class="step-btn" onclick="stepField('weight', -1)" aria-label="Minder gewicht">−</button>
-              <input type="number" step="0.5" min="0" id="weight" placeholder="–" inputmode="decimal" onfocus="this.select()" oninput="markDirty()">
+              <input type="number" step="0.5" min="0" id="weight" placeholder="–" inputmode="decimal" onfocus="onValueFocus(this)" onblur="onValueBlur(this)" oninput="onValueInput(this)">
               <button type="button" class="step-btn" onclick="stepField('weight', 1)" aria-label="Meer gewicht">+</button>
             </div>
           </div>
@@ -833,7 +833,7 @@
             <div class="step-label"><label for="reps">Reps</label><span class="step-size static">±1</span></div>
             <div class="stepper">
               <button type="button" class="step-btn" onclick="stepField('reps', -1)" aria-label="Minder reps">−</button>
-              <input type="number" id="reps" placeholder="–" min="1" inputmode="numeric" onfocus="this.select()" oninput="markDirty()">
+              <input type="number" id="reps" placeholder="–" min="1" inputmode="numeric" onfocus="onValueFocus(this)" onblur="onValueBlur(this)" oninput="onValueInput(this)">
               <button type="button" class="step-btn" onclick="stepField('reps', 1)" aria-label="Meer reps">+</button>
             </div>
           </div>
@@ -847,8 +847,7 @@
       <div id="workoutSets"></div>
 
       <div style="margin-top:12px">
-        <button class="btn btn-ghost btn-sm" onclick="openAddExerciseModal()">+ Oefening Toevoegen</button>
-        <button class="btn btn-ghost btn-sm" onclick="openRoutineEditor()">Schema aanpassen</button>
+        <button class="btn btn-ghost btn-sm" onclick="openRoutineEditor()">⚙️ Schema beheren</button>
       </div>
     </div>
 
@@ -995,24 +994,6 @@
   <div class="pr-sub" id="prBannerSub"></div>
 </div>
 
-<!-- ===== ADD EXERCISE MODAL ===== -->
-<div class="modal-backdrop" id="addExModal" onclick="closeModal(event, 'addExModal')">
-  <div class="modal" onclick="event.stopPropagation()">
-    <div class="modal-title">+ Oefening Toevoegen</div>
-    <label>Routine</label>
-    <input type="text" id="newRoutine" placeholder="Push / Pull / Legs / ..." list="routineDatalist">
-    <datalist id="routineDatalist"></datalist>
-    <label>Naam Oefening</label>
-    <input type="text" id="newExName" placeholder="Bijv. Bulgarian Split Squat">
-    <label>Notities (optioneel)</label>
-    <input type="text" id="newExNotes" placeholder="Tips, cues...">
-    <div class="btn-row" style="margin-top:8px">
-      <button class="btn btn-ghost" onclick="document.getElementById('addExModal').classList.remove('open')">Annuleer</button>
-      <button class="btn btn-gold" onclick="submitNewExercise()">Toevoegen ✓</button>
-    </div>
-  </div>
-</div>
-
 <!-- ===== TOAST ===== -->
 <dialog class="editor-dialog" id="logEditor" aria-labelledby="logEditorTitle">
   <h2 id="logEditorTitle">Set aanpassen</h2>
@@ -1052,10 +1033,12 @@
   </form>
 </dialog>
 <dialog class="editor-dialog" id="routineEditor" aria-labelledby="routineEditorTitle">
-  <h2 id="routineEditorTitle">Schema aanpassen</h2>
+  <h2 id="routineEditorTitle">Schema beheren</h2>
   <form onsubmit="saveRoutine(event)">
+    <label>Schema</label>
+    <div class="routine-chips editor-chips" id="editorChips"></div>
     <label for="editRoutineName">Naam schema</label>
-    <input id="editRoutineName" required type="text">
+    <input id="editRoutineName" required type="text" placeholder="bv. Push, Armen, Full body">
     <label>Oefeningen</label>
     <div id="routineRows"></div>
     <button class="btn btn-ghost btn-sm" type="button" onclick="addRoutineRow()">+ Oefening</button>
@@ -1229,7 +1212,12 @@
 
   async function api(url, options) {
     const response = await fetch(url, options);
-    if (!response.ok) throw new Error('Opslaan of laden mislukt. Probeer opnieuw.');
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      const error = new Error(typeof body?.detail === 'string' ? body.detail : 'Opslaan of laden mislukt. Probeer opnieuw.');
+      error.status = response.status;
+      throw error;
+    }
     return response.json();
   }
 
@@ -1295,18 +1283,12 @@
 
     await onRoutineChange(exercise);
     populateDashExerciseSelect();
-    populateRoutineDatalist();
   }
 
   function populateDashExerciseSelect() {
     const sel = document.getElementById('dashExerciseSelect');
     const all = Object.values(routinesData).flat();
     sel.innerHTML = all.map(e => `<option value="${e.id}">${escapeHtml(e.routine)} › ${escapeHtml(e.name)}</option>`).join('');
-  }
-
-  function populateRoutineDatalist() {
-    document.getElementById('routineDatalist').innerHTML =
-      Object.keys(routinesData).map(r => `<option value="${escapeHtml(r)}">`).join('');
   }
 
   // ================================================================
@@ -1403,10 +1385,49 @@
 
   function markDirty() { fieldsDirty = true; }
 
+  // A prefilled value is cleared when you tap the field (shown as a grey hint instead) and comes back
+  // if you leave the field empty. This avoids Android's text-selection toolbar and lets you type right away.
+  function onValueFocus(input) {
+    if (input.value !== '' && input.value === input.dataset.prefilled) {
+      input.dataset.restore = input.value;
+      input.dataset.hint = input.placeholder;
+      input.placeholder = input.value;
+      input.value = '';
+    }
+  }
+
+  function onValueBlur(input) {
+    if (input.value === '' && input.dataset.restore !== undefined) {
+      input.value = input.dataset.restore;
+      input.placeholder = input.dataset.hint ?? '–';
+    }
+    delete input.dataset.restore;
+  }
+
+  function onValueInput(input) {
+    if (input.dataset.restore !== undefined) input.placeholder = input.dataset.hint ?? '–';
+    delete input.dataset.restore;
+    delete input.dataset.prefilled;
+    markDirty();
+  }
+
+  function setPrefilled(input, value) {
+    const text = value == null ? '' : String(value);
+    input.value = text;
+    if (input.dataset.restore !== undefined) input.placeholder = input.dataset.hint ?? '–';
+    delete input.dataset.restore;
+    if (text !== '') input.dataset.prefilled = text; else delete input.dataset.prefilled;
+  }
+
   function resetSetFields() {
     fieldsDirty = false;
     lastPrefill = { weight: null, reps: null };
-    for (const id of ['weight', 'reps', 'notes']) document.getElementById(id).value = '';
+    for (const id of ['weight', 'reps', 'notes']) {
+      const input = document.getElementById(id);
+      input.value = '';
+      delete input.dataset.prefilled;
+      delete input.dataset.restore;
+    }
     showNotes(false);
     updateWeightStepLabel();
   }
@@ -1429,8 +1450,8 @@
     const sets = previousSession?.sets || [];
     const source = lastToday || sets.find(set => set.set_nr === setNr) || sets[sets.length - 1] || null;
     lastPrefill = { weight: source?.weight ?? null, reps: source?.reps ?? null };
-    document.getElementById('weight').value = lastPrefill.weight ?? '';
-    document.getElementById('reps').value = lastPrefill.reps ?? '';
+    setPrefilled(document.getElementById('weight'), lastPrefill.weight);
+    setPrefilled(document.getElementById('reps'), lastPrefill.reps);
   }
 
   function onSetNrInput() {
@@ -1449,6 +1470,8 @@
     const step = id === 'weight' ? weightStep : 1;
     const base = input.value === '' ? (lastPrefill[id] ?? 0) : Number(input.value);
     input.value = Math.max(id === 'reps' ? 1 : 0, Math.round((base + direction * step) * 100) / 100);
+    delete input.dataset.prefilled;
+    delete input.dataset.restore;
     markDirty();
     if (navigator.vibrate) navigator.vibrate(8);
   }
@@ -1516,8 +1539,12 @@
   }
 
   function prefillSet(weight, reps) {
-    document.getElementById('weight').value = weight ?? '';
-    document.getElementById('reps').value = reps ?? '';
+    for (const [id, value] of [['weight', weight], ['reps', reps]]) {
+      const input = document.getElementById(id);
+      input.value = value ?? '';
+      delete input.dataset.prefilled;
+      delete input.dataset.restore;
+    }
     markDirty();
   }
 
@@ -1665,75 +1692,39 @@
   }
 
   // ================================================================
-  // ADD EXERCISE MODAL
-  // ================================================================
-  function openAddExerciseModal() {
-    document.getElementById('addExModal').classList.add('open');
-    document.getElementById('newRoutine').value = document.getElementById('routineSelect').value;
-    document.getElementById('newExName').focus();
-  }
-
-  function closeModal(e, id) {
-    if (e.target.classList.contains('modal-backdrop') || e.currentTarget === e.target) {
-      document.getElementById(id).classList.remove('open');
-    }
-  }
-
-  async function submitNewExercise() {
-    const routine = document.getElementById('newRoutine').value.trim();
-    const name = document.getElementById('newExName').value.trim();
-    const notes = document.getElementById('newExNotes').value.trim();
-
-    if (!routine || !name) { toast('⚠️ Routine en naam zijn verplicht!'); return; }
-
-    const res = await fetch('/api/exercises', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ routine, name, notes })
-    });
-    const data = await res.json();
-
-    // Update local state
-    if (!routinesData[routine]) routinesData[routine] = [];
-    routinesData[routine].push({ id: data.id, routine, name, media_url: null, notes });
-
-    // Refresh selects
-    const routineSelect = document.getElementById('routineSelect');
-    routineSelect.innerHTML = Object.keys(routinesData)
-      .map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
-    routineSelect.value = routine;
-    onRoutineChange();
-
-    // Select the new exercise
-    const exSel = document.getElementById('exerciseSelect');
-    exSel.value = data.id;
-    onExerciseChange();
-
-    populateDashExerciseSelect();
-    populateRoutineDatalist();
-
-    document.getElementById('addExModal').classList.remove('open');
-    document.getElementById('newExName').value = '';
-    document.getElementById('newExNotes').value = '';
-    toast(`✅ "${name}" toegevoegd!`);
-  }
-
-  // ================================================================
-  // STATS & DASHBOARD
+  // SCHEMA MANAGER (add exercises, edit, reorder, new schema)
   // ================================================================
   function openRoutineEditor() {
-    editingRoutine = document.getElementById('routineSelect').value;
-    routineDraft = (routinesData[editingRoutine] || []).map(ex => ({ id: ex.id, name: ex.name }));
-    if (!routineDraft.length) return;
-    document.getElementById('editRoutineName').value = editingRoutine;
-    renderRoutineRows();
+    selectEditorRoutine(document.getElementById('routineSelect').value);
     document.getElementById('routineEditor').showModal();
   }
+
+  function selectEditorRoutine(name) {
+    editingRoutine = name;
+    routineDraft = name ? (routinesData[name] || []).map(ex => ({ id: ex.id, name: ex.name })) : [{ name: '' }];
+    if (!routineDraft.length) routineDraft = [{ name: '' }];
+    document.getElementById('editRoutineName').value = name;
+    renderEditorChips();
+    renderRoutineRows();
+  }
+
+  function renderEditorChips() {
+    document.getElementById('editorChips').innerHTML = Object.keys(routinesData).map(name =>
+      `<button type="button" class="routine-chip${name === editingRoutine ? ' active' : ''}" data-editor-routine="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join('')
+      + `<button type="button" class="routine-chip new${editingRoutine === '' ? ' active' : ''}" data-editor-new>＋ Nieuw</button>`;
+  }
+
+  document.getElementById('editorChips').addEventListener('click', event => {
+    const chip = event.target.closest('.routine-chip');
+    if (!chip) return;
+    selectEditorRoutine(chip.hasAttribute('data-editor-new') ? '' : chip.dataset.editorRoutine);
+    if (chip.hasAttribute('data-editor-new')) document.getElementById('editRoutineName').focus();
+  });
 
   function renderRoutineRows() {
     document.getElementById('routineRows').innerHTML = routineDraft.map((ex, index) => `
       <div class="routine-row">
-        <textarea aria-label="Oefening ${index + 1}" required rows="3" oninput="routineDraft[${index}].name = this.value">${escapeHtml(ex.name)}</textarea>
+        <textarea aria-label="Oefening ${index + 1}" required rows="3" placeholder="Naam oefening" oninput="routineDraft[${index}].name = this.value">${escapeHtml(ex.name)}</textarea>
         <button type="button" class="icon-button" title="Omhoog" aria-label="Oefening ${index + 1} omhoog" ${index === 0 ? 'disabled' : ''} onclick="moveRoutineRow(${index}, -1)">↑</button>
         <button type="button" class="icon-button" title="Omlaag" aria-label="Oefening ${index + 1} omlaag" ${index === routineDraft.length - 1 ? 'disabled' : ''} onclick="moveRoutineRow(${index}, 1)">↓</button>
         <button type="button" class="icon-button" title="Uit schema verwijderen" aria-label="Oefening ${index + 1} verwijderen" ${routineDraft.length === 1 ? 'disabled' : ''} onclick="routineDraft.splice(${index}, 1); renderRoutineRows()">×</button>
@@ -1760,13 +1751,14 @@
     if (!name || routineDraft.some(ex => !ex.name.trim())) { toast('Vul alle namen in.'); return; }
     button.disabled = true;
     try {
-      await api(`/api/routines/${encodeURIComponent(editingRoutine)}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      const creating = editingRoutine === '';
+      await api(creating ? '/api/routines' : `/api/routines/${encodeURIComponent(editingRoutine)}`, {
+        method: creating ? 'POST' : 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, exercises: routineDraft })
       });
       await loadRoutines(name);
       document.getElementById('routineEditor').close();
-      toast('Schema opgeslagen');
+      toast(creating ? `✅ Schema "${name}" aangemaakt` : 'Schema opgeslagen');
     } catch (error) { toast(error.message); }
     finally { button.disabled = false; }
   }

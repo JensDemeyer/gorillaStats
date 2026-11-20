@@ -8,7 +8,10 @@ const Cardio = (() => {
   let estimateRequest = 0;
 
   function blank(from) {
-    return { minutes: '', speed: from?.speed ?? '', incline: from?.incline ?? '', intensity: from?.intensity ?? 'matig' };
+    return {
+      minutes: '', speed: from?.speed ?? '', incline: from?.incline ?? '', intensity: from?.intensity ?? 'matig',
+      copied: from ? { speed: from.speed !== '', incline: from.incline !== '' } : {},
+    };
   }
 
   const kind = () => document.getElementById('cardioType').value;
@@ -32,8 +35,10 @@ const Cardio = (() => {
 
   function field(index, name, label, attributes) {
     const segment = segments[index];
+    // Values copied from the previous stage are cleared on tap (see onValueFocus in index.html).
+    const prefilled = segment.copied?.[name] && segment[name] !== '' ? ` data-prefilled="${segment[name]}"` : '';
     return `<div class="field"><label for="seg-${index}-${name}">${label}</label>
-      <input id="seg-${index}-${name}" type="number" inputmode="decimal" data-index="${index}" data-field="${name}" value="${segment[name] ?? ''}" ${attributes} onfocus="this.select()"></div>`;
+      <input id="seg-${index}-${name}" type="number" inputmode="decimal" data-index="${index}" data-field="${name}" value="${segment[name] ?? ''}" ${attributes}${prefilled}></div>`;
   }
 
   function renderSegments() {
@@ -105,7 +110,11 @@ const Cardio = (() => {
         ? `Berekend met ${nl(result.weight_kg, 1)} kg (${kind() === 'Loopband' ? 'ACSM-loopbandformule met helling' : 'MET-waarden'}). Je kunt het getal aanpassen.`
         : 'Geen lichaamsgewicht bekend: vul je gewicht in bij het tabblad Gewicht.';
     } catch (error) {
-      if (request === estimateRequest) note.textContent = 'Berekening niet beschikbaar.';
+      if (request === estimateRequest) {
+        note.textContent = error.status === 404
+          ? 'De server op de Pi draait nog een oude versie: herstart hem om kcal te berekenen.'
+          : 'Berekening niet beschikbaar.';
+      }
     }
   }
 
@@ -155,9 +164,14 @@ const Cardio = (() => {
     container.addEventListener('input', event => {
       const input = event.target.closest('input[data-field]');
       if (!input) return;
+      delete input.dataset.prefilled;
+      delete input.dataset.restore;
       segments[Number(input.dataset.index)][input.dataset.field] = input.value;
+      if (segments[Number(input.dataset.index)].copied) delete segments[Number(input.dataset.index)].copied[input.dataset.field];
       scheduleEstimate();
     });
+    container.addEventListener('focusin', event => { if (event.target.matches('input[data-field]')) onValueFocus(event.target); });
+    container.addEventListener('focusout', event => { if (event.target.matches('input[data-field]')) onValueBlur(event.target); });
     container.addEventListener('click', event => {
       const remove = event.target.closest('[data-remove]');
       if (remove) {

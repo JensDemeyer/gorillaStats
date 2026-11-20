@@ -21,8 +21,8 @@ voor verdere ontwikkeling; de desktopbrowser dient vooral voor lokale tests.
 - Daaronder: weekstreak, doelen, tegels met trainingsdagen per maand, gemiddelde per week,
 	sets en cardio van deze week, een staafgrafiek van de laatste 12 weken
 	(trainingsdagen, sets, volume of cardio) met een heatmap, en een lichaamskaart met BMI.
-- Fase 3 en 4 gebruiken hetzelfde beeld (`alfa`); fase 4 krijgt een gouden gloed.
-	Voeg je later een apart beeld voor fase 4 toe, pas dan `STAGES` in `static/js/journey.js` aan.
+- De zilverrug-fase gebruikt je logo; fase 1, 2, 4 en 5 hebben elk een eigen beeld.
+	De koppeling staat in `STAGES` in `static/js/journey.js`.
 - Alle keuzelijsten openen als donkere jungle-lijst onderaan het scherm
 	(`static/js/select.js`); de gewone `<select>` blijft onzichtbaar bestaan.
 
@@ -32,7 +32,8 @@ voor verdere ontwikkeling; de desktopbrowser dient vooral voor lokale tests.
 - Gewicht en reps staan al ingevuld: de laatst gelogde set van vandaag, anders
 	dezelfde set van de vorige sessie. Met **−** en **+** pas je ze snel aan; tik op
 	de staplengte (±2,5) om te wisselen tussen 0,5, 1,25, 2,5 en 5 kg. Tik je in een
-	veld, dan wordt de waarde geselecteerd zodat je meteen kunt overtypen.
+	veld, dan verdwijnt de ingevulde waarde en zie je hem grijs als hint; laat je het veld
+	leeg, dan komt de waarde terug. Zo kun je meteen typen zonder tekstselectie.
 - Na elke set krijg je een motivatiekaart (meer gewicht, meer reps, PR, oefening
 	klaar met knop naar de volgende) met de verdiende XP. De zinnen staan in
 	`static/js/motivation.js`.
@@ -46,9 +47,9 @@ voor verdere ontwikkeling; de desktopbrowser dient vooral voor lokale tests.
 - Swipe naar links voor de volgende oefening, naar rechts voor de vorige.
 	De pijltjes doen hetzelfde. Aangepaste, nog niet opgeslagen invoer blijft tijdens deze
 	browsersessie per oefening behouden.
-- Via **Schema aanpassen** kun je Push, Pull, Legs en eigen schema's hernoemen,
-	oefeningen aanpassen, toevoegen, verwijderen en herordenen. Oefeningen die
-	je uit een schema verwijdert, behouden hun trainingshistoriek.
+- Via **Schema beheren** doe je alles op één plek: een schema kiezen of een nieuw schema
+	aanmaken, het hernoemen, oefeningen toevoegen, aanpassen, verwijderen en herordenen.
+	Oefeningen die je uit een schema verwijdert, behouden hun trainingshistoriek.
 
 ## Gewicht, BMI en doel
 
