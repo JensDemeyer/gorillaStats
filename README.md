@@ -136,6 +136,42 @@ Vervang de placeholder door het echte Tailscale-IP. Gebruik op de Pi geen
 De app heeft geen eigen authenticatie: publiceer hem niet rechtstreeks op het
 internet en beperk toegang tot vertrouwde apparaten via Tailscale.
 
+## Eenmalige import van `dates.json` (Pi)
+
+`dates.json` bevat gymbezoeken (club, datum `DD-MM-YYYY`, tijd). `import_dates.py`
+bewaart club en starttijd per dag in de nieuwe tabel `workout_sessions` en vult
+dagen zonder logs op met geschatte sessies. Alleen de Python-standaardbibliotheek
+is nodig. Het script gebruikt jouw eigen echte (niet-geschatte) logs als referentie.
+
+- Dagen die al logs hebben blijven onaangeroerd.
+- De routine volgt Push → Pull → Legs na de vorige gelogde dag, en vermijdt
+	dezelfde routine als de eerstvolgende echte dag.
+- Per routine komen enkel oefeningen die in minstens de helft van je echte
+	sessies zitten, met je gebruikelijke aantal sets.
+- Gewicht wordt tussen je echte sessies geïnterpoleerd en op jouw gebruikelijke
+	gewichtsstap afgerond. Voor je eerste echte sessie ligt het hooguit één stap per
+	14 dagen (max. 10%) lager; erna blijft het op je laatste gemiddelde. Reps zijn
+	het gemiddelde van de drie dichtstbijzijnde echte sessies.
+- Alles wordt als **geschat** opgeslagen met notitie `import:dates.json | club tijd`:
+	het telt voor XP, streak en kalender, maar geeft geen PR's en dient nooit als
+	referentie. Opnieuw uitvoeren is veilig; alleen nieuwe datums worden ingevuld.
+
+Op de Pi (pas de servicenaam aan, zoek hem met `systemctl list-units | grep -i gorilla`):
+
+```sh
+# lokaal: committen en pushen (gym.db staat in .gitignore en blijft op de Pi onaangeroerd)
+cd <map-van-de-repo>
+sudo systemctl stop <service>
+git pull
+venv/bin/python import_dates.py --verbose     # dry-run: toont wat er zou gebeuren
+venv/bin/python import_dates.py --apply       # schrijft, met backup gym.db.pre-import-<tijd>
+sudo systemctl start <service>
+```
+
+Terugdraaien kan met `venv/bin/python import_dates.py --rollback --apply`
+(verwijdert alleen geïmporteerde sets en sessies), of door de backup terug te zetten.
+Tests: `.\venv\Scripts\python.exe -m unittest test_import_dates -v`.
+
 ## Data en afhankelijkheden
 
 De database `gym.db` wordt bij de eerste start in de projectmap aangemaakt,
