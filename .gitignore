@@ -4,6 +4,7 @@ __pycache__/
 gym.db
 gym.db-wal
 gym.db-shm
+gym.db.pre-import-*
 .vscode/
 static/media/
 !static/media/.gitkeep
