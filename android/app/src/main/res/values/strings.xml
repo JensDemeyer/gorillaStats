@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GorillaStats</string>
+    <string name="connecting">Verbinden met je Pi…</string>
+    <string name="unreachable">De Pi is niet bereikbaar. Controleer of Tailscale verbonden is.</string>
+    <string name="retry">Opnieuw proberen</string>
+</resources>

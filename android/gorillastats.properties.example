@@ -1,0 +1,8 @@
+# Kopieer dit bestand naar gorillastats.properties (staat in .gitignore) en pas het aan.
+
+# Adres van de app op de Pi, via het Tailscale-IP (of de MagicDNS-naam) en de uvicorn-poort.
+url=http://100.x.y.z:8000
+
+# Tailscale automatisch uitzetten als je de app sluit met de terugknop.
+# Stond de VPN al aan voor je de app opende, dan blijft hij aan.
+disconnectOnExit=true

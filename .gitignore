@@ -5,6 +5,15 @@ gym.db
 gym.db-wal
 gym.db-shm
 gym.db.pre-import-*
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/gorillastats.properties
+.idea/
+*.iml
 .vscode/
 static/media/
 !static/media/.gitkeep
