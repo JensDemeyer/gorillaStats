@@ -151,6 +151,98 @@ class BackendFeatureTests(unittest.TestCase):
         insight = main.get_exercise_insight(self.exercise_id)
         self.assertEqual((insight["trend"], insight["climbing"], insight["stagnation"]), ("up", 2, 1))
 
+    # --- insight on volume ---
+
+    def test_insight_compares_sets_on_volume_not_weight(self):
+        today = date.today()
+        self.log(50, 3, (today - timedelta(days=14)).isoformat())
+        self.log(30, 5, (today - timedelta(days=7)).isoformat())
+        insight = main.get_exercise_insight(self.exercise_id)
+        self.assertEqual((insight["trend"], insight["stagnation"]), ("same", 2))
+        self.assertEqual(insight["sessions"][0]["best_set"], {"weight": 30, "reps": 5})
+
+    # --- retries, single arm ---
+
+    def test_retry_with_same_client_id_does_not_duplicate_the_set(self):
+        entry = main.LogEntry(exercise_id=self.exercise_id, set_nr=1, weight=40, reps=8, client_id="retry-abcdef12")
+        first = main.save_log(entry)
+        again = main.save_log(entry)
+        self.assertEqual(first["id"], again["id"])
+        self.assertTrue(again["duplicate"])
+        self.assertEqual(len(main.get_today_logs()), 1)
+
+    def test_single_arm_is_stored_and_editable(self):
+        saved = main.save_log(main.LogEntry(exercise_id=self.exercise_id, set_nr=1, weight=10, reps=10, single_arm=True))
+        self.assertEqual(main.get_today_logs()[0]["single_arm"], 1)
+        main.update_log(saved["id"], main.LogUpdate(weight=10, reps=10, single_arm=False))
+        self.assertEqual(main.get_today_logs()[0]["single_arm"], 0)
+
+    def test_arm_exercises_get_the_single_arm_option_by_default(self):
+        exercises = {item["name"]: item for items in main.get_routines().values() for item in items}
+        self.assertTrue(exercises["Bicep Curl (Cable)"]["single_arm_option"])
+        self.assertTrue(exercises["Triceps Rope Pushdown"]["single_arm_option"])
+        self.assertFalse(exercises["Squat (Barbell)"]["single_arm_option"])
+
+    # --- muscle groups ---
+
+    def test_default_exercises_get_muscles_and_user_choices_survive_restart(self):
+        incline = main.get_routines()["Push"][0]
+        self.assertEqual((incline["primary_muscles"], incline["secondary_muscles"]),
+                         (["chest_upper"], ["shoulder_front", "triceps"]))
+        main.update_routine("Push", main.RoutineUpdate(name="Push", exercises=[
+            main.RoutineExercise(id=incline["id"], name=incline["name"], primary_muscles=["chest"], secondary_muscles=[])]))
+        main.init_db()
+        changed = main.get_routines()["Push"][0]
+        self.assertEqual((changed["primary_muscles"], changed["secondary_muscles"]), (["chest"], []))
+
+    def test_unknown_muscle_is_rejected_and_new_exercises_are_suggested(self):
+        with self.assertRaises(HTTPException):
+            main.create_routine(main.RoutineUpdate(name="X", exercises=[
+                main.RoutineExercise(name="Curl", primary_muscles=["wings"])]))
+        main.create_routine(main.RoutineUpdate(name="Armen", exercises=[main.RoutineExercise(name="dumbbell SHRUGS")]))
+        self.assertEqual(main.get_routines()["Armen"][0]["primary_muscles"], ["traps"])
+
+    def test_muscle_stats_count_primary_muscles_only_once_per_group(self):
+        routines = main.get_routines()
+        bent_row = next(item for item in routines["Pull"] if item["name"].startswith("Bent Over Row"))
+        squat = next(item for item in routines["Legs"] if item["name"].startswith("Squat"))
+        today = date.today().isoformat()
+        for exercise_id, weight, reps in ((bent_row["id"], 50, 10), (squat["id"], 100, 5)):
+            main.save_log(main.LogEntry(exercise_id=exercise_id, set_nr=1, weight=weight, reps=reps, log_date=today))
+        groups = {item["group"]: item for item in main.get_muscle_stats("week")["groups"]}
+        self.assertEqual((groups["Rug"]["volume"], groups["Rug"]["sets"]), (500, 1))
+        self.assertEqual(groups["Quadriceps"]["volume"], 500)
+        self.assertEqual(groups["Billen"]["volume"], 500)
+        self.assertEqual(groups["Hamstrings"]["volume"], 0)
+        with self.assertRaises(HTTPException):
+            main.get_muscle_stats("decade")
+
+    # --- schema library ---
+
+    def test_removed_exercises_move_to_the_library_and_can_return(self):
+        push = main.get_routines()["Push"]
+        keep, removed = push[0], push[1]
+        main.update_routine("Push", main.RoutineUpdate(name="Push", exercises=[
+            main.RoutineExercise(id=keep["id"], name=keep["name"])]))
+        library = main.get_exercise_library()
+        self.assertIn(removed["id"], [item["id"] for item in library])
+        main.update_routine("Push", main.RoutineUpdate(name="Push", exercises=[
+            main.RoutineExercise(id=keep["id"], name=keep["name"]),
+            main.RoutineExercise(id=removed["id"], name=removed["name"])]))
+        self.assertEqual([item["id"] for item in main.get_routines()["Push"]], [keep["id"], removed["id"]])
+        self.assertNotIn(removed["id"], [item["id"] for item in main.get_exercise_library()])
+
+    def test_library_exercise_is_kept_apart_and_names_cannot_repeat(self):
+        created = main.add_library_exercise(main.LibraryExercise(name="Dumbbell Shrugs"))
+        self.assertEqual(created["primary_muscles"], ["traps"])
+        self.assertNotIn("Dumbbell Shrugs", [item["name"] for items in main.get_routines().values() for item in items])
+        with self.assertRaises(HTTPException) as error:
+            main.add_library_exercise(main.LibraryExercise(name="dumbbell shrugs"))
+        self.assertEqual(error.exception.status_code, 409)
+        with self.assertRaises(HTTPException):
+            main.update_routine("Push", main.RoutineUpdate(name="Push", exercises=[
+                main.RoutineExercise(id=main.get_routines()["Pull"][0]["id"], name="Steal")]))
+
 
 if __name__ == "__main__":
     unittest.main()

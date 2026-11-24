@@ -44,12 +44,41 @@ voor verdere ontwikkeling; de desktopbrowser dient vooral voor lokale tests.
 	Dit kan tijdens de training of via het trainingslog met datumkeuze, ook op
 	een volgende dag. Ontbrekende waarden tellen niet mee als nulmetingen of PR's.
 - De rusttimer start alleen wanneer je zelf een tijd kiest.
-- Swipe naar links voor de volgende oefening, naar rechts voor de vorige.
-	De pijltjes doen hetzelfde. Aangepaste, nog niet opgeslagen invoer blijft tijdens deze
-	browsersessie per oefening behouden.
+- Swipe naar links of rechts wisselt van tabblad (niet van oefening); de pijltjes naast de
+	oefeningkiezer gaan naar de vorige of volgende oefening. De terugknop of terugswipe van je gsm sluit
+	eerst het open scherm (evolutieroute, schema beheren, ...) en gaat daarna naar het vorige tabblad;
+	pas op het eerste scherm sluit hij de app (`static/js/nav.js`). Aangepaste, nog niet opgeslagen
+	invoer blijft tijdens deze browsersessie per oefening behouden.
+- **Set opslaan** heeft een timeout van 10 seconden en probeert bij een haperende verbinding tot drie keer
+	opnieuw. Elke set krijgt een `client_id`, zodat een herhaling nooit een dubbele set oplevert. Faalt het toch,
+	dan krijg je een melding en kun je gewoon nogmaals tikken. Alle aanvragen in de app hebben een timeout.
+- Bij arm-oefeningen (biceps, triceps, onderarmen, zij- en achterschouder, of "single arm" in de naam) staat
+	boven gewicht en reps een keuze **Beide armen / 1 arm**. De keuze wordt per set bewaard en getoond
+	("1 arm"); de motivatie vergelijkt een set enkel met een set met hetzelfde aantal armen. In **Schema
+	beheren** zet je de optie per oefening aan of uit.
+- Elke oefening toont onder de keuzelijst een gorilla (voor- en achterkant) met de **primaire** (goud) en
+	**secundaire** (groen) spiergroepen. Het schema beheren heeft per oefening een uitklapbare spierkiezer.
+- Motivatie en de inzichtkaart vergelijken op **volume** (gewicht x reps van de set), dus 3 x 50 is gelijk aan
+	5 x 30. De zinnen staan nog steeds in `static/js/motivation.js`.
 - Via **Schema beheren** doe je alles op één plek: een schema kiezen of een nieuw schema
 	aanmaken, het hernoemen, oefeningen toevoegen, aanpassen, verwijderen en herordenen.
-	Oefeningen die je uit een schema verwijdert, behouden hun trainingshistoriek.
+	De **vaste oefeningen** van het schema staan bovenaan; oefeningen die je eruit haalt (×) of die je
+	apart bewaart, staan daaronder bij **Overige oefeningen** (met zoekveld). Met **＋ Schema** haal je ze terug;
+	met **Bewaar** voeg je een nieuwe oefening toe zonder ze in een schema te zetten. Oefeningen die je uit een
+	schema verwijdert, behouden hun trainingshistoriek.
+
+## Spiergroepen
+
+`exercises.primary_muscles` en `secondary_muscles` bevatten sleutels uit `MUSCLES` in `main.py` (fijn, bv.
+`chest_upper`, `lats`) die elk bij één statistiekgroep horen: Borst, Rug, Schouders, Biceps, Triceps,
+Onderarmen, Quadriceps, Hamstrings, Billen en Kuiten (core en adductoren tellen niet mee). Bij het starten
+worden de oefeningen uit `EXERCISE_MUSCLES` ingevuld waar nog niets was ingesteld; wat je zelf kiest wordt nooit
+overschreven. Nieuwe oefeningen krijgen automatisch een suggestie als hun naam bekend is.
+
+Op het dashboard toont **Spiergroepen** per periode (week, maand, 12 weken, alles) het volume (gewicht x reps) en
+het aantal sets per groep, met een gorilla als heatmap. Alleen primaire spieren tellen mee; heeft een oefening
+twee primaire groepen (bv. squat: quadriceps en billen), dan krijgt elke groep het volledige volume, en een
+groep telt maar één keer per oefening. API: `GET /api/muscles`, `GET /api/muscles/stats?period=week|month|12w|all`.
 
 ## Gewicht, BMI en doel
 
@@ -85,7 +114,8 @@ HTML-bestand met CSS en JavaScript (`static/css`, `static/js`), zonder buildstap
 
 ## Fitdays CSV
 
-De knop **CSV importeren** opent de bestandskiezer en uploadt het gekozen
+De knop **CSV importeren** opent de bestandskiezer (zonder bestandstypefilter, zodat een `.csv` dat je gsm
+als spreadsheet bestempelt toch aanklikbaar is) en uploadt het gekozen
 bestand direct. De import ondersteunt puntkomma's, komma's en tabs als
 scheidingsteken, decimale komma's, Fitdays-datums zoals `17:36 Jan.27,2025`
 en eenheden zoals `kg`, `%` en `kcal`. `- -` blijft een ontbrekende waarde.
@@ -256,9 +286,13 @@ ze tot de Pi bereikbaar is (tot 30 seconden, de start wordt hooguit twee keer he
 laadt de app. Tijdens het opstarten toont de app een jungle-scherm met je logo en drie
 stappen (Tailscale, je Pi, app laden) met live status, een voortgangsbalk en een teller.
 Lukt het niet, dan staat de mislukte stap in het rood met **Opnieuw proberen** en
-**Tailscale openen**. Sluit je de app met
-de terugknop, dan zet ze Tailscale weer uit, behalve als er al een VPN actief was
-voor je de app opende. Bestanden kiezen (CSV, afbeeldingen) werkt zoals in de browser.
+**Tailscale openen**. Sluit je de app definitief (terugknop op het eerste scherm, of uit het geheugen
+vegen in de recente apps), dan zet ze Tailscale weer uit, behalve als er al een VPN actief was
+voor je de app opende. Naar het homescherm gaan laat Tailscale aan. Het uit-het-geheugen-vegen wordt
+opgevangen door `ExitService`, die Tailscale uitzet zodra Android meldt dat de app is verwijderd. Een
+terugknop of terugswipe binnen de app sluit eerst het open scherm of gaat naar het vorige tabblad.
+Bestanden kiezen (CSV, afbeeldingen) toont alle bestanden, ook een `.csv` dat je gsm als spreadsheet
+bestempelt; de import leest het bestand zelf als gewone tekst.
 HTTPS is voor de app niet nodig; `http://<tailscale-ip>:8000` volstaat omdat het
 verkeer toch door de Tailscale-tunnel loopt.
 

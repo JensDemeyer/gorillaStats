@@ -17,6 +17,8 @@ const SHELL = [
   '/static/js/body.js',
   '/static/js/dashboard.js',
   '/static/js/cardio.js',
+  '/static/js/muscles.js',
+  '/static/js/nav.js',
   '/static/stages/baby.webp',
   '/static/stages/puber.webp',
   '/static/stages/zilverrug.webp',

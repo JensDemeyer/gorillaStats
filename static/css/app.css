@@ -318,3 +318,50 @@
 .notice code { padding: 1px 5px; color: var(--gold); background: var(--bg-deep); border-radius: 4px; }
 .editor-chips { margin-bottom: 14px; flex-wrap: wrap; }
 .routine-chip.new { color: var(--gold); border-style: dashed; }
+
+/* ===== Muscle groups, arm toggle, schema library ===== */
+.muscle-figure { display: block; width: 100%; height: auto; }
+.mb-shape { fill: #1f2d22; stroke: #314535; stroke-width: .6; transition: fill .2s; }
+.mb-shape.mb-p { fill: var(--gold-bright); stroke: #f5c04a; }
+.mb-shape.mb-s { fill: #4a9a56; stroke: #6dbb78; }
+.mb-shape.mb-heat { fill: var(--gold-bright); stroke: #f5c04a; }
+.mb-detail { stroke: none; }
+.mb-detail.dark { fill: #0d140e; }
+.mb-detail.light { fill: #2e4333; }
+.mb-detail.eye { fill: var(--gold-bright); }
+.mb-label { fill: var(--text-muted); font: 700 8px 'Barlow Condensed', sans-serif; letter-spacing: 1.5px; text-anchor: middle; }
+.muscle-card { display: flex; gap: 14px; align-items: center; margin-bottom: 14px; padding: 10px 14px; background: var(--bg-card2); border: 1px solid var(--border); border-radius: 12px; }
+.muscle-card[hidden] { display: none; }
+.muscle-card .muscle-figure { flex: 0 0 120px; width: 120px; }
+.muscle-copy { min-width: 0; display: grid; gap: 8px; font-size: .9rem; line-height: 1.4; overflow-wrap: anywhere; }
+.muscle-kind { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 999px; font: 800 .75rem 'Barlow Condensed', sans-serif; letter-spacing: 1px; text-transform: uppercase; color: var(--bg-deep); }
+.muscle-kind.p { background: var(--gold-bright); }
+.muscle-kind.s { background: #4a9a56; }
+.muscle-stats { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 14px; align-items: center; }
+.muscle-list { display: grid; gap: 9px; min-width: 0; }
+.muscle-row-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 8px; font-size: .8rem; color: var(--text-dim); }
+.muscle-row-head span:first-child { color: var(--text-bright); font-weight: 600; }
+.muscle-row.none .muscle-row-head span:first-child { color: var(--text-muted); }
+.muscle-bar { height: 7px; margin-top: 3px; background: var(--bg-deep); border-radius: 4px; overflow: hidden; }
+.muscle-bar span { display: block; height: 100%; background: linear-gradient(90deg, #c47800, var(--gold-bright)); border-radius: 4px; }
+.arm-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+.arm-toggle[hidden] { display: none; }
+.arm-toggle button { min-height: 44px; cursor: pointer; color: var(--text-dim); background: var(--bg-deep); border: 1.5px solid var(--border); border-radius: 10px; font: 800 1rem 'Barlow Condensed', sans-serif; letter-spacing: 1px; text-transform: uppercase; }
+.arm-toggle button.active { color: var(--gold-bright); border-color: var(--gold); background: rgba(212,163,115,.15); }
+.row-details { grid-column: 1 / -1; padding: 6px 4px 2px; }
+.row-details summary { min-height: 32px; cursor: pointer; color: var(--gold); font-size: .85rem; overflow-wrap: anywhere; }
+.muscle-pick { margin: 10px 0 4px; }
+.muscle-pick > span { display: block; margin-bottom: 6px; color: var(--text-dim); font-size: .75rem; letter-spacing: .5px; text-transform: uppercase; }
+.muscle-pick .chip-row { margin-bottom: 4px; }
+.muscle-pick .chip { min-height: 36px; background: transparent; cursor: pointer; font: inherit; font-size: .8rem; color: var(--text-dim); }
+.library-section { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); }
+.library-section h3 { margin-bottom: 6px; font: 800 1.1rem 'Barlow Condensed', sans-serif; }
+.library-section p { margin-bottom: 10px; }
+#libraryRows { max-height: 260px; overflow-y: auto; margin: 10px 0; overscroll-behavior: contain; }
+.library-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.library-info { min-width: 0; flex: 1; display: grid; gap: 2px; overflow-wrap: anywhere; }
+.library-info small { color: var(--text-muted); }
+.library-new { display: flex; gap: 8px; align-items: center; }
+.library-new input { margin: 0; }
+.library-new .btn { width: auto; flex: 0 0 auto; margin: 0; }
+@media (max-width: 330px) { .muscle-stats { grid-template-columns: 1fr; } .muscle-stats .muscle-figure { max-width: 150px; margin: 0 auto; } }

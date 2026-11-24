@@ -126,12 +126,10 @@ const Cardio = (() => {
     const calories = document.getElementById('cardioCal').value;
     button.disabled = true;
     try {
-      const response = await fetch('/api/cardio', {
+      const saved = await api('/api/cardio', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: kind(), segments: valid.map(toPayload), calories: caloriesDirty && calories !== '' ? Number(calories) : null }),
       });
-      if (!response.ok) throw new Error('Cardio opslaan mislukt. Probeer opnieuw.');
-      const saved = await response.json();
       segments = [blank()];
       caloriesDirty = false;
       document.getElementById('cardioCal').value = '';
@@ -140,7 +138,7 @@ const Cardio = (() => {
       const message = Motivation.pick('cardio');
       Coach.show({ ...message, line: saved.calories != null ? `${nl(saved.calories)} kcal verbrand. ${message.line}` : message.line });
       loadCardioHistory();
-      await loadStats(true);
+      loadStats(true);
     } catch (error) {
       toast(error.message || 'Geen verbinding. Probeer opnieuw.');
     } finally {

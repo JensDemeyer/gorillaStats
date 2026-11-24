@@ -732,6 +732,17 @@
       <div class="heat-key"><span>12 weken geleden</span><span>Vandaag</span></div>
     </div>
 
+    <div class="card">
+      <div class="card-title">💪 Spiergroepen</div>
+      <div id="musclePeriod" class="chip-row">
+        <span class="chip active" data-period="week" onclick="MuscleUI.selectPeriod(this)">Deze week</span>
+        <span class="chip" data-period="month" onclick="MuscleUI.selectPeriod(this)">Deze maand</span>
+        <span class="chip" data-period="12w" onclick="MuscleUI.selectPeriod(this)">12 weken</span>
+        <span class="chip" data-period="all" onclick="MuscleUI.selectPeriod(this)">Alles</span>
+      </div>
+      <div id="muscleStats"><div class="empty-state"><p>Laden...</p></div></div>
+    </div>
+
     <button type="button" class="card body-card" id="bodyCard" onclick="showTab('bodyweight')" aria-label="Open lichaam en gewicht">
       <div class="card-title">⚖️ Lichaam</div>
       <div id="bodyCardContent"><div class="empty-state"><p>Nog geen weging.</p></div></div>
@@ -801,6 +812,8 @@
         <button class="icon-button" id="nextExercise" onclick="navigateExercise(1)" title="Volgende oefening" aria-label="Volgende oefening">→</button>
       </div>
 
+      <div class="muscle-card" id="muscleCard" hidden></div>
+
       <div class="insight-card" id="exerciseInsight" hidden>
         <div class="insight-emoji" id="insightEmoji" aria-hidden="true">🦍</div>
         <div class="insight-copy">
@@ -823,6 +836,10 @@
           <label for="setNr">Set</label>
           <input type="number" id="setNr" value="1" min="1" inputmode="numeric" oninput="onSetNrInput()">
           <button type="button" class="step-btn small" onclick="stepSetNr(1)" aria-label="Volgend setnummer">+</button>
+        </div>
+        <div class="arm-toggle" id="armToggle" role="group" aria-label="Aantal armen" hidden>
+          <button type="button" id="armBoth" class="active" aria-pressed="true" onclick="setArmMode(false)">Beide armen</button>
+          <button type="button" id="armSingle" aria-pressed="false" onclick="setArmMode(true)">1 arm</button>
         </div>
         <div class="step-grid">
           <div class="step-field">
@@ -958,7 +975,7 @@
     <!-- Fitdays CSV import -->
     <div class="card">
       <div class="card-title">📂 Fitdays</div>
-      <input type="file" id="csvFileInput" accept=".csv,text/csv,text/plain,application/vnd.ms-excel" hidden onchange="importCSV()">
+      <input type="file" id="csvFileInput" hidden onchange="importCSV()">
       <button class="btn btn-ghost" id="importCSVButton" onclick="document.getElementById('csvFileInput').click()">📂 CSV importeren</button>
       <div id="importResult" role="status" aria-live="polite" style="margin-top:10px;font-size:0.85rem;color:var(--text-dim);overflow-wrap:anywhere"></div>
     </div>
@@ -1009,6 +1026,7 @@
     <label for="editWeight">Gewicht (kg, optioneel)</label>
     <input id="editWeight" type="number" min="0" step="0.01" inputmode="decimal" oninput="document.getElementById('editEstimated').checked = false">
     <label class="selection-label"><input id="editEstimated" type="checkbox">Geschat gewicht</label>
+    <label class="selection-label"><input id="editSingleArm" type="checkbox">Met één arm</label>
     <label for="editReps">Reps (optioneel)</label>
     <input id="editReps" type="number" min="1" inputmode="numeric">
     <label for="editNotes">Notities</label>
@@ -1043,9 +1061,19 @@
     <div class="routine-chips editor-chips" id="editorChips"></div>
     <label for="editRoutineName">Naam schema</label>
     <input id="editRoutineName" required type="text" placeholder="bv. Push, Armen, Full body">
-    <label>Oefeningen</label>
+    <label>⭐ Vaste oefeningen in dit schema</label>
     <div id="routineRows"></div>
     <button class="btn btn-ghost btn-sm" type="button" onclick="addRoutineRow()">+ Oefening</button>
+    <section class="library-section" aria-labelledby="libraryTitle">
+      <h3 id="libraryTitle">📚 Overige oefeningen</h3>
+      <p class="text-muted">Staan in je database, met historiek, maar niet in dit schema. Een oefening die je met × uit het schema haalt, komt hier terecht.</p>
+      <input id="librarySearch" type="search" placeholder="Zoeken..." oninput="renderLibrary()">
+      <div id="libraryRows"></div>
+      <div class="library-new">
+        <input id="libraryNewName" type="text" maxlength="120" placeholder="Nieuwe oefening bewaren" aria-label="Naam nieuwe oefening">
+        <button class="btn btn-ghost btn-sm" id="libraryNewButton" type="button" onclick="addLibraryExercise()">＋ Bewaar</button>
+      </div>
+    </section>
     <div class="btn-row section-gap">
       <button class="btn btn-ghost" type="button" onclick="document.getElementById('routineEditor').close()">Annuleer</button>
       <button class="btn btn-gold" id="saveRoutineButton" type="submit">Opslaan</button>
@@ -1071,6 +1099,8 @@
 <script src="/static/js/body.js"></script>
 <script src="/static/js/dashboard.js"></script>
 <script src="/static/js/cardio.js"></script>
+<script src="/static/js/muscles.js"></script>
+<script src="/static/js/nav.js"></script>
 <script>
   // ================================================================
   // STATE
@@ -1211,18 +1241,37 @@
 
   function setSummary(set) {
     if (set.weight == null && set.reps == null) return 'Nog aan te vullen';
-    return `${set.weight == null ? '? kg' : `${set.weight} kg`} × ${set.reps == null ? '? reps' : `${set.reps} reps`}${set.is_estimated ? ' · geschat' : ''}`;
+    return `${set.weight == null ? '? kg' : `${set.weight} kg`} × ${set.reps == null ? '? reps' : `${set.reps} reps`}${set.single_arm ? ' · 1 arm' : ''}${set.is_estimated ? ' · geschat' : ''}`;
   }
 
-  async function api(url, options) {
-    const response = await fetch(url, options);
-    if (!response.ok) {
-      const body = await response.json().catch(() => null);
-      const error = new Error(typeof body?.detail === 'string' ? body.detail : 'Opslaan of laden mislukt. Probeer opnieuw.');
-      error.status = response.status;
+  // Every request gets a timeout: on a phone the connection can silently die (app in background,
+  // VPN switching) and a plain fetch would then wait forever, leaving buttons disabled.
+  async function api(url, options = {}) {
+    const { timeout = 15000, ...fetchOptions } = options;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(url, { ...fetchOptions, signal: controller.signal });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const error = new Error(typeof body?.detail === 'string' ? body.detail : 'Opslaan of laden mislukt. Probeer opnieuw.');
+        error.status = response.status;
+        error.retryable = response.status >= 500;
+        throw error;
+      }
+      return await response.json();
+    } catch (error) {
+      if (error.name === 'AbortError' || error instanceof TypeError) {
+        const failure = new Error(error.name === 'AbortError'
+          ? 'De verbinding reageert niet. Controleer Tailscale en probeer opnieuw.'
+          : 'Geen verbinding met de server. Probeer opnieuw.');
+        failure.retryable = true;
+        throw failure;
+      }
       throw error;
+    } finally {
+      clearTimeout(timer);
     }
-    return response.json();
   }
 
   function setHeaderDate() {
@@ -1240,8 +1289,10 @@
     return TAB_ORDER.find(tab => document.getElementById('page-' + tab).classList.contains('active')) || 'dashboard';
   }
 
-  function showTab(tab) {
-    const direction = Math.sign(TAB_ORDER.indexOf(tab) - TAB_ORDER.indexOf(currentTab()));
+  function showTab(tab, fromHistory = false) {
+    const previousTab = currentTab();
+    if (!fromHistory && tab !== previousTab) Nav.pushTab(tab);
+    const direction = Math.sign(TAB_ORDER.indexOf(tab) - TAB_ORDER.indexOf(previousTab));
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active', 'from-left', 'from-right'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     const page = document.getElementById('page-' + tab);
@@ -1266,8 +1317,7 @@
     }
   }
 
-  // Swipe left/right to change tab. On the Training tab the content swipe changes exercise instead
-  // (see below), so there you swipe on the tab bar. Charts, inputs and scrollable rows never start a swipe.
+  // Swipe left/right to change tab. Charts, inputs and scrollable rows never start a swipe.
   let tabSwipe = null;
   const tabSwipeIgnore = 'input, select, textarea, canvas, .routine-chips, .jsel, .heat';
 
@@ -1276,10 +1326,9 @@
     if (next) showTab(next);
   }
 
-  for (const [area, allowOnWorkout] of [[document.querySelector('main'), false], [document.querySelector('header'), true]]) {
+  for (const area of [document.querySelector('main'), document.querySelector('header')]) {
     area.addEventListener('touchstart', event => {
-      const blocked = event.touches.length !== 1 || event.target.closest(tabSwipeIgnore)
-        || (!allowOnWorkout && currentTab() === 'workout');
+      const blocked = event.touches.length !== 1 || event.target.closest(tabSwipeIgnore);
       tabSwipe = blocked ? null : { x: event.touches[0].clientX, y: event.touches[0].clientY };
     }, { passive: true });
     area.addEventListener('touchcancel', () => { tabSwipe = null; }, { passive: true });
@@ -1296,13 +1345,22 @@
   // INIT
   // ================================================================
   async function init() {
+    Nav.init('dashboard');
     setHeaderDate();
     updateSoundButton();
     const today = new Date();
     document.getElementById('logDate').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     document.getElementById('editLogDate').max = document.getElementById('logDate').value;
     document.getElementById('backfillDate').max = document.getElementById('logDate').value;
-    await loadRoutines();
+    try {
+      await Muscles.load();
+    } catch (error) { /* the app works without muscle labels; they load with the next request */ }
+    try {
+      await loadRoutines();
+    } catch (error) {
+      toast(error.message, 4000);
+      setTimeout(() => loadRoutines().catch(() => {}), 5000);
+    }
     loadStats();
     loadTodayLog();
     loadProgressChart();
@@ -1312,8 +1370,7 @@
   }
 
   async function loadRoutines(preferredRoutine, preferredExercise) {
-    const res = await fetch('/api/routines');
-    routinesData = await res.json();
+    routinesData = await api('/api/routines');
 
     const routineSelect = document.getElementById('routineSelect');
     const routine = preferredRoutine || routineSelect.value;
@@ -1368,6 +1425,7 @@
     selectedExerciseId = exId;
     const request = ++exerciseRequest;
     resetSetFields();
+    MuscleUI.showExercise(currentExercise());
     previousSession = null;
     todaySets = [];
     document.getElementById('setNr').value = 1;
@@ -1418,6 +1476,7 @@
 
   // --- Set fields: prefill, steppers, notes ---
   let fieldsDirty = false;
+  let singleArm = false;
   let todaySets = [];
   let lastPrefill = { weight: null, reps: null };
   const weightSteps = [0.5, 1.25, 2.5, 5];
@@ -1462,6 +1521,7 @@
 
   function resetSetFields() {
     fieldsDirty = false;
+    singleArm = false;
     lastPrefill = { weight: null, reps: null };
     for (const id of ['weight', 'reps', 'notes']) {
       const input = document.getElementById(id);
@@ -1471,6 +1531,7 @@
     }
     showNotes(false);
     updateWeightStepLabel();
+    updateArmToggle();
   }
 
   function showNotes(visible) {
@@ -1483,6 +1544,26 @@
     document.getElementById('notes').focus();
   }
 
+  function currentExercise() {
+    const id = document.getElementById('exerciseSelect').value;
+    return Object.values(routinesData).flat().find(ex => String(ex.id) === String(id)) || null;
+  }
+
+  function updateArmToggle() {
+    const available = Boolean(currentExercise()?.single_arm_option) || singleArm;
+    document.getElementById('armToggle').hidden = !available;
+    document.getElementById('armBoth').classList.toggle('active', !singleArm);
+    document.getElementById('armSingle').classList.toggle('active', singleArm);
+    document.getElementById('armBoth').setAttribute('aria-pressed', String(!singleArm));
+    document.getElementById('armSingle').setAttribute('aria-pressed', String(singleArm));
+  }
+
+  function setArmMode(value) {
+    singleArm = value;
+    markDirty();
+    updateArmToggle();
+  }
+
   // Fills weight and reps: the last set logged today, else the same set number of the previous session.
   function applyPrefill() {
     if (fieldsDirty) return;
@@ -1493,6 +1574,8 @@
     lastPrefill = { weight: source?.weight ?? null, reps: source?.reps ?? null };
     setPrefilled(document.getElementById('weight'), lastPrefill.weight);
     setPrefilled(document.getElementById('reps'), lastPrefill.reps);
+    singleArm = Boolean(source?.single_arm);
+    updateArmToggle();
   }
 
   function onSetNrInput() {
@@ -1542,21 +1625,6 @@
     onExerciseChange();
   }
 
-  let swipeStart = null;
-  const workoutPage = document.getElementById('page-workout');
-  workoutPage.addEventListener('touchstart', event => {
-    swipeStart = event.touches.length === 1 && !event.target.closest('input, select, textarea, button, label, #workoutSets')
-      ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
-  }, { passive: true });
-  workoutPage.addEventListener('touchcancel', () => { swipeStart = null; }, { passive: true });
-  workoutPage.addEventListener('touchend', event => {
-    if (!swipeStart) return;
-    const dx = event.changedTouches[0].clientX - swipeStart.x;
-    const dy = event.changedTouches[0].clientY - swipeStart.y;
-    swipeStart = null;
-    if (Math.abs(dx) >= 60 && Math.abs(dx) > Math.abs(dy) * 1.5) navigateExercise(dx < 0 ? 1 : -1);
-  }, { passive: true });
-
   function updatePreviousSetHint() {
     const data = previousSession;
     const container = document.getElementById('prevSession');
@@ -1592,6 +1660,29 @@
   // ================================================================
   // SUBMIT LOG
   // ================================================================
+  // A retry (automatic or by tapping again) reuses the same id, so the server never stores a set twice.
+  let saveAttempt = null;
+
+  function newClientId() {
+    if (window.crypto?.randomUUID) return crypto.randomUUID();
+    return Array.from({ length: 4 }, () => Math.random().toString(36).slice(2, 10)).join('');
+  }
+
+  async function postSet(payload) {
+    let failure;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await api('/api/logs', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), timeout: 10000 });
+      } catch (error) {
+        failure = error;
+        if (!error.retryable) break;
+        await new Promise(resolve => setTimeout(resolve, 700 * (attempt + 1)));
+      }
+    }
+    throw failure;
+  }
+
   async function submitLog() {
     const button = document.getElementById('saveSetButton');
     if (button.disabled) return;
@@ -1607,50 +1698,59 @@
       toast('Controleer setnummer, gewicht en reps.'); return;
     }
     const request = exerciseRequest;
+    const signature = JSON.stringify([exId, setNr, weight, reps, notes, singleArm]);
+    if (saveAttempt?.signature !== signature) saveAttempt = { signature, clientId: newClientId() };
+    const usedSingleArm = singleArm;
 
     button.disabled = true;
+    button.textContent = 'Opslaan...';
+    let data;
     try {
-    const res = await fetch('/api/logs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ exercise_id: exId, set_nr: setNr, weight, reps, notes })
-    });
-    if (!res.ok) throw new Error('Set opslaan mislukt. Probeer opnieuw.');
-    const data = await res.json();
-
-    exerciseDrafts.delete(String(exId));
-    const previousSet = previousSession?.sets?.find(set => set.set_nr === setNr) || null;
-    const feedback = Motivation.setFeedback({
-      weight, reps, previous: previousSet, isPr: data.is_pr, setNr, previousSetCount: previousSession?.sets?.length || 0 });
-    if (request === exerciseRequest) {
-      todaySets.push({ set_nr: setNr, weight, reps });
-      fieldsDirty = false;
-      document.getElementById('setNr').value = setNr + 1;
-      document.getElementById('notes').value = '';
-      showNotes(false);
-      applyPrefill();
-      updatePreviousSetHint();
-    }
-
-    // Feedback: PR banner, otherwise the coach card with a next-exercise shortcut after the last set
-    Coach.burst(button, data.is_pr ? ['🏆', '🔥', '⭐'] : ['💪', '🔥']);
-    if (data.is_pr) {
-      showPRBanner(`${weight}kg × ${reps} · ${feedback.line}`);
-    } else {
-      const select = document.getElementById('exerciseSelect');
-      const hasNext = feedback.kind === 'exerciseDone' && select.selectedIndex < select.options.length - 1;
-      Coach.show({ ...feedback, action: hasNext ? { label: 'Volgende oefening →', run: () => navigateExercise(1) } : null });
-    }
-
-    // Refresh today log & stats
-    loadTodayLog();
-    await loadStats(true);
-
+      data = await postSet({ exercise_id: exId, set_nr: setNr, weight, reps, notes, single_arm: usedSingleArm,
+        client_id: saveAttempt.clientId });
+      saveAttempt = null;
     } catch (error) {
-      toast(error.message || 'Geen verbinding. Probeer opnieuw.');
+      toast(error.message || 'Set opslaan mislukt. Probeer opnieuw.', 4000);
+      button.textContent = '💪 SET OPSLAAN';
+      if (request === exerciseRequest) button.disabled = false;
+      return;
+    }
+    button.textContent = '💪 SET OPSLAAN';
+
+    try {
+      exerciseDrafts.delete(String(exId));
+      const previousSet = previousSession?.sets?.find(set => set.set_nr === setNr) || null;
+      const feedback = Motivation.setFeedback({
+        weight, reps, previous: previousSet, isPr: data.is_pr, setNr, singleArm: usedSingleArm,
+        previousSetCount: previousSession?.sets?.length || 0 });
+      if (request === exerciseRequest) {
+        todaySets.push({ set_nr: setNr, weight, reps, single_arm: usedSingleArm });
+        fieldsDirty = false;
+        document.getElementById('setNr').value = setNr + 1;
+        document.getElementById('notes').value = '';
+        showNotes(false);
+        applyPrefill();
+        updatePreviousSetHint();
+      }
+
+      // Feedback: PR banner, otherwise the coach card with a next-exercise shortcut after the last set
+      Coach.burst(button, data.is_pr ? ['🏆', '🔥', '⭐'] : ['💪', '🔥']);
+      if (data.is_pr) {
+        showPRBanner(`${weight}kg × ${reps} · ${feedback.line}`);
+      } else {
+        const select = document.getElementById('exerciseSelect');
+        const hasNext = feedback.kind === 'exerciseDone' && select.selectedIndex < select.options.length - 1;
+        Coach.show({ ...feedback, action: hasNext ? { label: 'Volgende oefening →', run: () => navigateExercise(1) } : null });
+      }
+    } catch (error) {
+      console.error(error);
     } finally {
       if (request === exerciseRequest) button.disabled = false;
     }
+
+    // The set is saved; refreshing the lists must never keep the button locked.
+    loadTodayLog();
+    loadStats(true);
   }
 
   // ================================================================
@@ -1740,13 +1840,78 @@
     document.getElementById('routineEditor').showModal();
   }
 
+  let libraryItems = [];
+  let libraryRequest = 0;
+
   function selectEditorRoutine(name) {
     editingRoutine = name;
-    routineDraft = name ? (routinesData[name] || []).map(ex => ({ id: ex.id, name: ex.name })) : [{ name: '' }];
+    routineDraft = name ? (routinesData[name] || []).map(ex => ({
+      id: ex.id, name: ex.name, primary_muscles: [...(ex.primary_muscles || [])],
+      secondary_muscles: [...(ex.secondary_muscles || [])], single_arm_option: Boolean(ex.single_arm_option), touched: false,
+    })) : [{ name: '' }];
     if (!routineDraft.length) routineDraft = [{ name: '' }];
     document.getElementById('editRoutineName').value = name;
     renderEditorChips();
     renderRoutineRows();
+    loadLibrary();
+  }
+
+  async function loadLibrary() {
+    const request = ++libraryRequest;
+    document.getElementById('libraryRows').innerHTML = '<div class="text-muted">Laden...</div>';
+    try {
+      const items = await api('/api/exercises/library');
+      if (request !== libraryRequest) return;
+      libraryItems = items;
+      renderLibrary();
+    } catch (error) {
+      if (request === libraryRequest) document.getElementById('libraryRows').innerHTML = `<div class="text-muted">${escapeHtml(error.message)}</div>`;
+    }
+  }
+
+  function renderLibrary() {
+    const term = document.getElementById('librarySearch').value.trim().toLowerCase();
+    const inDraft = new Set(routineDraft.map(ex => ex.id).filter(id => id != null));
+    const items = libraryItems.filter(item => !inDraft.has(item.id) && item.name.toLowerCase().includes(term));
+    document.getElementById('libraryRows').innerHTML = items.length ? items.map(item => `
+      <div class="library-row">
+        <div class="library-info">
+          <strong>${escapeHtml(item.name)}</strong>
+          <small>${[item.former_routine ? `uit ${escapeHtml(item.former_routine)}` : '', item.sets ? `${item.sets} sets historiek` : '',
+            escapeHtml(Muscles.labels(item.primary_muscles || []))].filter(Boolean).join(' · ')}</small>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addFromLibrary(${item.id})" aria-label="${escapeHtml(item.name)} toevoegen aan schema">＋ Schema</button>
+      </div>`).join('')
+      : `<div class="text-muted">${term ? 'Niets gevonden.' : 'Geen overige oefeningen. Oefeningen die je uit een schema haalt, komen hier terecht.'}</div>`;
+  }
+
+  function addFromLibrary(id) {
+    const item = libraryItems.find(entry => entry.id === id);
+    if (!item) return;
+    routineDraft.push({
+      id: item.id, name: item.name, primary_muscles: [...(item.primary_muscles || [])],
+      secondary_muscles: [...(item.secondary_muscles || [])], single_arm_option: Boolean(item.single_arm_option), touched: false,
+    });
+    renderRoutineRows();
+    renderLibrary();
+  }
+
+  async function addLibraryExercise() {
+    const input = document.getElementById('libraryNewName');
+    const button = document.getElementById('libraryNewButton');
+    const name = input.value.trim();
+    if (!name || button.disabled) return;
+    button.disabled = true;
+    try {
+      const item = await api('/api/exercises/library', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+      libraryItems.push(item);
+      input.value = '';
+      document.getElementById('librarySearch').value = '';
+      renderLibrary();
+      toast(`"${item.name}" bewaard bij de overige oefeningen`);
+    } catch (error) { toast(error.message); }
+    finally { button.disabled = false; }
   }
 
   function renderEditorChips() {
@@ -1762,14 +1927,66 @@
     if (chip.hasAttribute('data-editor-new')) document.getElementById('editRoutineName').focus();
   });
 
+  for (const id of ['libraryNewName', 'librarySearch']) {
+    document.getElementById(id).addEventListener('keydown', event => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      if (id === 'libraryNewName') addLibraryExercise();
+    });
+  }
+
+  function draftMuscleSummary(ex) {
+    const primary = Muscles.labels(ex.primary_muscles || []);
+    const text = primary ? `Spieren: ${primary}` : 'Spieren instellen';
+    return ex.single_arm_option ? `${text} · 1-arm optie` : text;
+  }
+
   function renderRoutineRows() {
     document.getElementById('routineRows').innerHTML = routineDraft.map((ex, index) => `
       <div class="routine-row">
         <textarea aria-label="Oefening ${index + 1}" required rows="3" placeholder="Naam oefening" oninput="routineDraft[${index}].name = this.value">${escapeHtml(ex.name)}</textarea>
         <button type="button" class="icon-button" title="Omhoog" aria-label="Oefening ${index + 1} omhoog" ${index === 0 ? 'disabled' : ''} onclick="moveRoutineRow(${index}, -1)">↑</button>
         <button type="button" class="icon-button" title="Omlaag" aria-label="Oefening ${index + 1} omlaag" ${index === routineDraft.length - 1 ? 'disabled' : ''} onclick="moveRoutineRow(${index}, 1)">↓</button>
-        <button type="button" class="icon-button" title="Uit schema verwijderen" aria-label="Oefening ${index + 1} verwijderen" ${routineDraft.length === 1 ? 'disabled' : ''} onclick="routineDraft.splice(${index}, 1); renderRoutineRows()">×</button>
+        <button type="button" class="icon-button" title="Naar overige oefeningen" aria-label="Oefening ${index + 1} uit schema halen" ${routineDraft.length === 1 ? 'disabled' : ''} onclick="removeRoutineRow(${index})">×</button>
+        <details class="row-details" ${ex.open ? 'open' : ''} ontoggle="routineDraft[${index}].open = this.open">
+          <summary>${escapeHtml(draftMuscleSummary(ex))}</summary>
+          ${Muscles.picker(index, ex.primary_muscles || [], ex.secondary_muscles || [])}
+          <label class="selection-label"><input type="checkbox" ${ex.single_arm_option ? 'checked' : ''} onchange="setDraftSingleArm(${index}, this.checked)">Optie om met één arm te loggen</label>
+        </details>
       </div>`).join('');
+    if (document.getElementById('libraryRows')) renderLibrary();
+  }
+
+  function toggleDraftMuscle(index, kind, key) {
+    const ex = routineDraft[index];
+    const own = `${kind}_muscles`;
+    const other = kind === 'primary' ? 'secondary_muscles' : 'primary_muscles';
+    const current = ex[own] || [];
+    ex[own] = current.includes(key) ? current.filter(item => item !== key) : [...current, key];
+    ex[other] = (ex[other] || []).filter(item => item !== key);
+    ex.touched = true;
+    ex.open = true;
+    renderRoutineRows();
+  }
+
+  function setDraftSingleArm(index, value) {
+    routineDraft[index].single_arm_option = value;
+    routineDraft[index].touched = true;
+    routineDraft[index].open = true;
+    renderRoutineRows();
+  }
+
+  function removeRoutineRow(index) {
+    const [removed] = routineDraft.splice(index, 1);
+    if (removed.id != null && !libraryItems.some(item => item.id === removed.id)) {
+      libraryItems.push({
+        id: removed.id, name: removed.name, former_routine: editingRoutine || null, sets: null,
+        primary_muscles: removed.primary_muscles || [], secondary_muscles: removed.secondary_muscles || [],
+        single_arm_option: Boolean(removed.single_arm_option),
+      });
+      libraryItems.sort((a, b) => a.name.localeCompare(b.name, 'nl'));
+    }
+    renderRoutineRows();
   }
 
   function moveRoutineRow(index, direction) {
@@ -1795,7 +2012,11 @@
       const creating = editingRoutine === '';
       await api(creating ? '/api/routines' : `/api/routines/${encodeURIComponent(editingRoutine)}`, {
         method: creating ? 'POST' : 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, exercises: routineDraft })
+        body: JSON.stringify({ name, exercises: routineDraft.map(ex => ({
+          id: ex.id, name: ex.name,
+          ...(ex.touched ? { primary_muscles: ex.primary_muscles || [], secondary_muscles: ex.secondary_muscles || [],
+            single_arm_option: Boolean(ex.single_arm_option) } : {}),
+        })) })
       });
       await loadRoutines(name);
       document.getElementById('routineEditor').close();
@@ -1807,13 +2028,12 @@
   async function loadStats(celebrate = false) {
     const request = ++statsRequest;
     try {
-    const res = await fetch('/api/stats');
-    if (!res.ok) throw new Error('Voortgang laden mislukt.');
-    const data = await res.json();
+    const data = await api('/api/stats');
     if (request !== statsRequest) return;
 
     renderRewards(data.rewards, celebrate);
     Dashboard.load();
+    MuscleUI.loadStats();
 
     const wall = document.getElementById('prWall');
     if (!data.recent_prs || data.recent_prs.length === 0) {
@@ -1892,6 +2112,7 @@
     document.getElementById('editLogExercise').value = log.exercise_id;
     document.getElementById('editWeight').value = log.weight ?? '';
     document.getElementById('editEstimated').checked = Boolean(log.is_estimated);
+    document.getElementById('editSingleArm').checked = Boolean(log.single_arm);
     document.getElementById('editReps').value = log.reps ?? '';
     document.getElementById('editNotes').value = log.notes || '';
     document.getElementById('logEditor').showModal();
@@ -1909,6 +2130,7 @@
           log_date: document.getElementById('editLogDate').value,
           exercise_id: Number(document.getElementById('editLogExercise').value),
           is_estimated: document.getElementById('editEstimated').checked,
+          single_arm: document.getElementById('editSingleArm').checked,
           weight: document.getElementById('editWeight').value === '' ? null : Number(document.getElementById('editWeight').value),
           reps: document.getElementById('editReps').value === '' ? null : Number(document.getElementById('editReps').value),
           notes: document.getElementById('editNotes').value
@@ -2089,9 +2311,8 @@
     const exId = document.getElementById('dashExerciseSelect').value;
     if (!exId) return;
 
-    const res = await fetch(`/api/progress/${exId}`);
-    const data = await res.json();
-
+    let data;
+    try { data = await api(`/api/progress/${exId}`); } catch (error) { return; }
     const labels = data.map(d => d.date);
     const values = data.map(d => d[activeMetric] ? parseFloat(d[activeMetric]).toFixed(1) : null);
 
@@ -2140,8 +2361,8 @@
   // CARDIO
   // ================================================================
   async function loadCardioHistory() {
-    const res = await fetch('/api/cardio');
-    const data = await res.json();
+    let data;
+    try { data = await api('/api/cardio'); } catch (error) { return; }
     const container = document.getElementById('cardioHistory');
     if (!data.length) {
       container.innerHTML = '<div class="empty-state"><div class="icon">🏃</div><p>Nog geen cardio gelogd.</p></div>';
@@ -2174,12 +2395,11 @@
     button.disabled = true;
     try {
     const previousWeight = bodyweightData.length ? bodyweightData[bodyweightData.length - 1].weight_kg : null;
-    const response = await fetch('/api/bodyweight', {
+    await api('/api/bodyweight', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ weight_kg: kg, body_fat_pct: fat, muscle_mass_kg: muscle })
     });
-    if (!response.ok) throw new Error('Gewicht opslaan mislukt. Probeer opnieuw.');
 
     document.getElementById('bwKg').value = '';
     document.getElementById('bwFat').value = '';
@@ -2187,7 +2407,7 @@
     Coach.show({ ...Motivation.weightFeedback(previousWeight, kg), duration: 4200 });
     loadBwChart();
     Body.load();
-    await loadStats(true);
+    loadStats(true);
     } catch (error) {
       toast(error.message || 'Geen verbinding. Probeer opnieuw.');
     } finally {
@@ -2207,12 +2427,10 @@
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const response = await fetch('/api/bodyweight/import-csv', { method: 'POST', body: formData });
-      const data = await response.json();
-      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Importeren mislukt. Controleer het CSV-bestand.');
+      const data = await api('/api/bodyweight/import-csv', { method: 'POST', body: formData, timeout: 90000 });
       result.textContent = `${data.imported} ${data.imported === 1 ? 'meetdag' : 'meetdagen'} geïmporteerd, ${data.skipped} rijen overgeslagen.${data.warnings?.length ? ' ' + data.warnings.join(' ') : ''}`;
       await loadBwChart();
-      await loadStats(true);
+      loadStats(true);
     } catch (error) {
       result.textContent = error.message || 'Geen verbinding. Probeer opnieuw.';
     } finally {

@@ -30,6 +30,34 @@ const Motivation = (() => {
         'Als je dit volhoudt, mag je volgende keer zwaarder.',
       ],
     },
+    moreVolume: {
+      emoji: ['🦍', '💪', '🔥', '🚀'],
+      titles: ['Meer volume dan vorige keer!', 'Sterker over de hele set!', 'Plus {diff} kg volume!'],
+      lines: [
+        '{diff} kg meer volume (gewicht × reps) dan vorige keer. Zo word je een echte Zilverrug!',
+        'Je totale werk in deze set ging omhoog. Dat is vooruitgang, hoe je het ook verdeelt.',
+        'Meer volume, meer gorilla. Hou dit tempo vast!',
+        'Gewicht en reps samen: dit was meer dan vorige keer. Goed gedaan!',
+      ],
+    },
+    lessVolume: {
+      emoji: ['🦍', '🌿', '💚'],
+      titles: ['Een rustigere set', 'Minder volume, geen paniek', 'Telt gewoon mee!'],
+      lines: [
+        'Wat minder volume dan vorige keer. Zo\'n dag heeft iedereen, het gaat om de lange termijn.',
+        'Zelfs een Zilverrug heeft rustigere dagen. Jij bent er, dat is het belangrijkste.',
+        'Volgende set weer vol gas. Je kunt dit.',
+      ],
+    },
+    sameVolume: {
+      emoji: ['✅', '🦍', '🧱'],
+      titles: ['Zelfde volume als vorige keer', 'Even veel werk verzet'],
+      lines: [
+        'Gewicht × reps komt op hetzelfde uit als vorige keer, ook al is de verdeling anders.',
+        'Evenveel volume als vorige keer. Probeer nu een rep of een schijfje extra!',
+        'Een solide set met hetzelfde volume. Consistentie bouwt gorilla\'s.',
+      ],
+    },
     same: {
       emoji: ['✅', '🦍', '🧱', '👌'],
       titles: ['Even sterk als vorige keer', 'Stabiel als een Zilverrug', 'Consistent!', 'Zelfde niveau, solide set'],
@@ -103,27 +131,27 @@ const Motivation = (() => {
       emoji: ['⚠️', '🥶'],
       titles: ['Je zit vast!'],
       lines: [
-        'Je staat al {n} sessies op rij vast op {w} kg. Tijd om de jungle in te duiken: probeer een extra rep of een klein schijfje erbij!',
-        '{n} sessies met {w} kg. Zo wordt je nooit King Kong! Durf een stapje zwaarder.',
-        '{n} keer hetzelfde gewicht ({w} kg). Je lichaam is eraan gewend, geef het iets nieuws!',
+        'Je staat al {n} sessies op rij vast op {w}. Tijd om de jungle in te duiken: probeer een extra rep of een klein schijfje erbij!',
+        '{n} sessies met {w}. Zo wordt je nooit King Kong! Durf een stapje zwaarder.',
+        '{n} keer hetzelfde volume ({w}). Je lichaam is eraan gewend, geef het iets nieuws!',
       ],
     },
     stagnation3: {
       emoji: ['⚠️', '🤔'],
       titles: ['Drie keer hetzelfde'],
       lines: [
-        'Je staat al {n} sessies op rij op {w} kg. Zo wordt je nooit King Kong!',
-        '{n} sessies op {w} kg. Probeer vandaag meer reps of een klein stapje omhoog.',
-        'Tijd voor een uitdaging: {w} kg is inmiddels je comfortzone geworden.',
+        'Je staat al {n} sessies op rij op {w}. Zo wordt je nooit King Kong!',
+        '{n} sessies op {w}. Probeer vandaag meer reps of een klein stapje omhoog.',
+        'Tijd voor een uitdaging: {w} is inmiddels je comfortzone geworden.',
       ],
     },
     stagnation2: {
       emoji: ['🦍', '🎯'],
       titles: ['Stabiel, maar durf meer'],
       lines: [
-        'Twee keer op rij {w} kg. Probeer vandaag een extra rep te halen!',
-        'Je zit stevig op {w} kg. Eén rep meer en je bent weer in beweging.',
-        '{w} kg gaat goed. Klaar voor een uitdaging?',
+        'Twee keer op rij {w}. Probeer vandaag een extra rep te halen!',
+        'Je zit stevig op {w}. Eén rep meer en je bent weer in beweging.',
+        '{w} gaat goed. Klaar voor een uitdaging?',
       ],
     },
     climbing: {
@@ -139,8 +167,8 @@ const Motivation = (() => {
       emoji: ['💪', '🦍'],
       titles: ['Laatste keer vooruitgang'],
       lines: [
-        'Vorige keer ging je omhoog naar {w} kg. Probeer dat vandaag te bevestigen!',
-        'Je laatste sessie was sterk ({w} kg). Maak het vandaag nog beter!',
+        'Vorige keer ging je omhoog naar {w}. Probeer dat vandaag te bevestigen!',
+        'Je laatste sessie was sterk ({w}). Maak het vandaag nog beter!',
       ],
     },
     down: {
@@ -181,7 +209,7 @@ const Motivation = (() => {
       titles: ['Lekker bezig!', 'Klaar voor actie!', 'De jungle roept!'],
       lines: [
         'Lekker bezig maat, de jungle is van jou!',
-        'Laatste keer {w} kg. Kun je dat verbeteren?',
+        'Laatste keer {w}. Kun je dat verbeteren?',
         'Focus, ademhaling, techniek. De rest volgt vanzelf.',
         'Een goede warming-up is het halve werk. Daarna: vol gas!',
         'Elke rep telt. Maak er vandaag eentje meer.',
@@ -246,18 +274,35 @@ const Motivation = (() => {
   const kg = value => (Math.round(value * 100) / 100).toLocaleString('nl-NL');
 
   // Compares the set that was just saved with the same set number of the previous session.
-  function setFeedback({ weight, reps, previous, isPr, setNr, previousSetCount }) {
+  // The comparison is on volume (weight x reps), so 3 x 50 and 5 x 30 count as equal work.
+  function setFeedback({ weight, reps, previous, isPr, setNr, previousSetCount, singleArm = false }) {
     if (isPr) return { kind: 'pr', ...pick('pr') };
-    const real = previous && !previous.is_estimated && previous.weight != null && weight != null;
+    const sameArms = !previous || Boolean(previous.single_arm) === Boolean(singleArm);
+    const real = previous && sameArms && !previous.is_estimated && previous.weight != null && weight != null;
     let kind = 'noPrev';
     const vars = {};
     if (real) {
       const heavier = weight - previous.weight;
-      if (heavier > 0.01) { kind = 'moreWeight'; vars.diff = kg(heavier); }
+      const repDiff = reps != null && previous.reps != null ? reps - previous.reps : null;
+      const volumeDiff = repDiff != null && weight > 0 && previous.weight > 0
+        ? weight * reps - previous.weight * previous.reps : null;
+      if (volumeDiff != null) {
+        if (volumeDiff > 0.01) {
+          if (heavier > 0.01 && repDiff >= 0) { kind = 'moreWeight'; vars.diff = kg(heavier); }
+          else if (repDiff > 0 && heavier >= -0.01) { kind = 'moreReps'; vars.diff = repDiff; }
+          else { kind = 'moreVolume'; vars.diff = kg(volumeDiff); }
+        } else if (volumeDiff < -0.01) {
+          if (heavier < -0.01 && repDiff <= 0) kind = 'lessWeight';
+          else if (repDiff < 0 && heavier <= 0.01) kind = 'lessReps';
+          else kind = 'lessVolume';
+        } else {
+          kind = Math.abs(heavier) > 0.01 ? 'sameVolume' : 'same';
+        }
+      } else if (heavier > 0.01) { kind = 'moreWeight'; vars.diff = kg(heavier); }
       else if (heavier < -0.01) kind = 'lessWeight';
-      else if (reps != null && previous.reps != null) {
-        if (reps > previous.reps) { kind = 'moreReps'; vars.diff = reps - previous.reps; }
-        else if (reps < previous.reps) kind = 'lessReps';
+      else if (repDiff != null) {
+        if (repDiff > 0) { kind = 'moreReps'; vars.diff = repDiff; }
+        else if (repDiff < 0) kind = 'lessReps';
         else kind = 'same';
       } else kind = 'same';
     }
@@ -270,7 +315,8 @@ const Motivation = (() => {
     const sessions = insight?.sessions || [];
     if (!sessions.length) return { kind: 'fresh', ...pick('fresh'), chips: [] };
     const latest = sessions[0];
-    const vars = { n: insight.stagnation, w: kg(latest.max_weight), days: insight.days_since };
+    const top = latest.best_set || { weight: latest.max_weight, reps: latest.max_reps };
+    const vars = { n: insight.stagnation, w: `${kg(top.weight)} kg × ${top.reps}`, days: insight.days_since };
     let kind = 'fine';
     if (insight.stagnation >= 4) kind = 'stagnation4';
     else if (insight.stagnation === 3) kind = 'stagnation3';
@@ -280,9 +326,9 @@ const Motivation = (() => {
     else if (insight.trend === 'up') kind = 'up';
     else if (insight.trend === 'down') kind = 'down';
     else if (insight.trend === 'same') kind = 'same1';
-    const chips = [`Laatst ${kg(latest.max_weight)} kg${latest.max_reps ? ` × ${latest.max_reps}` : ''}`];
+    const chips = [`Laatst ${vars.w}`];
     if (insight.best_weight != null) chips.push(`Beste ${kg(insight.best_weight)} kg`);
-    if (insight.stagnation >= 2) chips.push(`${insight.stagnation}× zelfde gewicht`);
+    if (insight.stagnation >= 2) chips.push(`${insight.stagnation}× zelfde volume`);
     else if (insight.climbing >= 2) chips.push(`${insight.climbing}× omhoog`);
     return { kind, ...pick(kind, vars), chips };
   }
