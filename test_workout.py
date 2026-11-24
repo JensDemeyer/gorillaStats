@@ -283,6 +283,15 @@ class PwaTests(unittest.TestCase):
         self.assertEqual(worker.headers["cache-control"], "no-cache")
         self.assertTrue(Path(worker.path).is_file())
 
+    def test_app_code_is_revalidated_so_updates_show_up_after_a_pull(self):
+        self.assertEqual(main.serve_index().headers["cache-control"], "no-cache")
+        static = main.RevalidatedStaticFiles(directory=main.STATIC_DIR)
+        scope = {"type": "http", "method": "GET", "headers": []}
+        for name, expected in (("js/muscles.js", "no-cache"), ("css/app.css", "no-cache"), ("vendor/chart.umd.min.js", None)):
+            path = main.STATIC_DIR / name
+            response = static.file_response(str(path), path.stat(), scope)
+            self.assertEqual(response.headers.get("cache-control"), expected, name)
+
     def test_index_uses_only_local_assets_and_precached_files_exist(self):
         html = (main.STATIC_DIR / "index.html").read_text(encoding="utf-8")
         self.assertIn('rel="manifest"', html)

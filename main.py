@@ -1620,12 +1620,23 @@ async def import_fitdays_csv(file: UploadFile = File(...)):
 
 # --- Static files & SPA ---
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+class RevalidatedStaticFiles(StaticFiles):
+    """Without Cache-Control, a phone browser or WebView keeps using old JS/CSS for hours after a git pull."""
+
+    def file_response(self, full_path, stat_result, scope, status_code=200):
+        response = super().file_response(full_path, stat_result, scope, status_code)
+        path = Path(full_path)
+        if path.suffix in (".js", ".css", ".html") and "vendor" not in path.parts:
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
+app.mount("/static", RevalidatedStaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
 def serve_index():
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/logo.png", include_in_schema=False)
