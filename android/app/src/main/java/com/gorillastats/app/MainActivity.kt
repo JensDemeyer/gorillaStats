@@ -5,12 +5,14 @@ import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
+import android.os.IBinder
 import android.os.SystemClock
 import android.view.ViewGroup
 import android.webkit.ValueCallback
@@ -43,7 +45,13 @@ class MainActivity : ComponentActivity() {
     private var loadFailures = 0
     private var failed = false
     private var vpnWasActive = false
+    private var exitBound = false
     private var fileCallback: ValueCallback<Array<Uri>>? = null
+
+    private val exitConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, service: IBinder) {}
+        override fun onServiceDisconnected(name: ComponentName) {}
+    }
 
     private val fileChooser =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -67,13 +75,22 @@ class MainActivity : ComponentActivity() {
 
         // When a VPN is already active we assume it is Tailscale and leave it alone, also on exit.
         vpnWasActive = isVpnActive()
+        ExitService.disconnectOnClose = BuildConfig.DISCONNECT_ON_EXIT && !vpnWasActive
+        startService(Intent(this, ExitService::class.java))
+        exitBound = bindService(Intent(this, ExitService::class.java), exitConnection, Context.BIND_AUTO_CREATE)
         connectAndLoad()
     }
 
     override fun onDestroy() {
         generation++
         worker.shutdownNow()
-        if (isFinishing && BuildConfig.DISCONNECT_ON_EXIT && !vpnWasActive) disconnectTailscale()
+        if (isFinishing) {
+            if (ExitService.disconnectOnClose) Tailscale.disconnect(this)
+            ExitService.disconnectOnClose = false
+        }
+        if (exitBound) unbindService(exitConnection)
+        exitBound = false
+        if (isFinishing) stopService(Intent(this, ExitService::class.java))
         (webView.parent as? ViewGroup)?.removeView(webView)
         webView.destroy()
         super.onDestroy()
@@ -171,24 +188,14 @@ class MainActivity : ComponentActivity() {
     // have the exported IPNReceiver broadcast, which is what we fall back to.
     private fun connectTailscale() {
         try {
-            startActivity(Intent(ACTION_CONNECT).setComponent(TAILSCALE_ACTIVITY))
+            startActivity(Intent(Tailscale.ACTION_CONNECT).setComponent(Tailscale.ACTIVITY))
         } catch (_: Exception) {
-            sendTailscaleBroadcast(ACTION_CONNECT)
-        }
-    }
-
-    // A broadcast works while we are being destroyed, unlike starting an activity.
-    private fun disconnectTailscale() = sendTailscaleBroadcast(ACTION_DISCONNECT)
-
-    private fun sendTailscaleBroadcast(action: String) {
-        try {
-            sendBroadcast(Intent(action).setComponent(TAILSCALE_RECEIVER))
-        } catch (_: Exception) {
+            Tailscale.sendBroadcast(this, Tailscale.ACTION_CONNECT)
         }
     }
 
     private fun openTailscale() {
-        val launch = packageManager.getLaunchIntentForPackage(TAILSCALE_PACKAGE) ?: return
+        val launch = packageManager.getLaunchIntentForPackage(Tailscale.PACKAGE) ?: return
         try {
             startActivity(launch)
         } catch (_: Exception) {
@@ -266,8 +273,14 @@ class MainActivity : ComponentActivity() {
             ): Boolean {
                 fileCallback?.onReceiveValue(null)
                 fileCallback = callback
+                // Our own picker instead of params.createIntent(): that one filters on MIME type, and
+                // phones often label a .csv as a spreadsheet, which greys the file out. */* lists everything.
+                val intent = Intent(Intent.ACTION_GET_CONTENT)
+                    .addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType("*/*")
+                    .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params.mode == FileChooserParams.MODE_OPEN_MULTIPLE)
                 return try {
-                    fileChooser.launch(params.createIntent())
+                    fileChooser.launch(Intent.createChooser(intent, params.title))
                     true
                 } catch (_: ActivityNotFoundException) {
                     fileCallback = null
@@ -278,11 +291,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private companion object {
-        const val TAILSCALE_PACKAGE = "com.tailscale.ipn"
-        const val ACTION_CONNECT = "com.tailscale.ipn.CONNECT_VPN"
-        const val ACTION_DISCONNECT = "com.tailscale.ipn.DISCONNECT_VPN"
-        val TAILSCALE_ACTIVITY = ComponentName(TAILSCALE_PACKAGE, "$TAILSCALE_PACKAGE.AutomationActivity")
-        val TAILSCALE_RECEIVER = ComponentName(TAILSCALE_PACKAGE, "$TAILSCALE_PACKAGE.IPNReceiver")
         const val STEP_VPN = 0
         const val STEP_PI = 1
         const val STEP_APP = 2
