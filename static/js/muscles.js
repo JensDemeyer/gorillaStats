@@ -145,6 +145,47 @@ const MuscleUI = (() => {
   }
 
   const nl = value => Number(value).toLocaleString('nl-NL');
+  const PERIODS = [['week', 'Deze week'], ['month', 'Deze maand'], ['12w', '12 weken'], ['all', 'Alles']];
+  const shortDate = iso => new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: '2-digit' });
+
+  function groupSheet(data) {
+    const peak = Math.max(...data.weekly.map(week => week.volume), 1);
+    const weekly = data.weekly.map(week => `<span class="gw-bar" title="Week van ${shortDate(week.start)}: ${nl(week.volume)} kg">
+      <i style="height:${Math.max(3, Math.round(week.volume / peak * 100))}%"></i></span>`).join('');
+    const exercises = data.exercises.length ? data.exercises.map(item => `<div class="gx-row">
+        <div><strong>${escapeHtml(item.name)}</strong>${item.prs ? `<span class="ss-pr">🏆 ${item.prs}</span>` : ''}
+          <small>${item.sets} sets in ${item.sessions} ${item.sessions === 1 ? 'training' : 'trainingen'} · laatst ${shortDate(item.last_date)}</small></div>
+        <div class="gx-side"><b>${nl(item.volume)} kg</b>${item.record
+          ? `<small>Record ${nl(item.record.weight)} kg × ${item.record.reps} (${shortDate(item.record.date)})</small>` : ''}</div>
+      </div>`).join('') : '<div class="empty-state"><p>Geen sets in deze periode.</p></div>';
+    const prs = data.recent_prs.length ? `<h3>Recente PR's</h3>${data.recent_prs.map(pr =>
+      `<div class="gx-pr"><span>🏆 ${escapeHtml(pr.name)}</span><b>${nl(pr.weight)} kg × ${pr.reps}</b><small>${shortDate(pr.date)}</small></div>`).join('')}` : '';
+    const supporting = data.supporting.length ? `<h3>Ondersteunend bij</h3><p class="text-muted">${data.supporting.map(escapeHtml).join(', ')}</p>` : '';
+    return `<div class="chip-row">${PERIODS.map(([id, name]) =>
+        `<button type="button" class="chip${id === data.period ? ' active' : ''}" data-group-period="${id}" data-group="${escapeHtml(data.group)}">${name}</button>`).join('')}</div>
+      <div class="cd-stats"><div><span>Volume</span><strong>${nl(data.total_volume)} kg</strong></div><div><span>Sets</span><strong>${data.total_sets}</strong></div>
+        <div><span>Oefeningen</span><strong>${data.exercises.length}</strong></div></div>
+      <h3>Volume per week (12 weken)</h3><div class="gw-bars">${weekly}</div>
+      <h3>Oefeningen</h3>${exercises}${prs}${supporting}`;
+  }
+
+  async function openGroup(group, groupPeriod = period) {
+    try {
+      const data = await api(`/api/muscle-groups/${encodeURIComponent(group)}?period=${groupPeriod}`);
+      Sheet.open(group, groupSheet(data));
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+
+  Sheet.element().addEventListener('click', event => {
+    const chip = event.target.closest('[data-group-period]');
+    if (chip) openGroup(chip.dataset.group, chip.dataset.groupPeriod);
+  });
+  document.addEventListener('click', event => {
+    const row = event.target.closest('.muscle-row[data-group]');
+    if (row) openGroup(row.dataset.group);
+  });
 
   async function loadStats() {
     const container = document.getElementById('muscleStats');
@@ -158,10 +199,10 @@ const MuscleUI = (() => {
       const rows = [...data.groups].sort((a, b) => b.volume - a.volume || b.sets - a.sets);
       const peak = Math.max(...rows.map(row => row.volume), 0);
       const list = peak
-        ? rows.map(row => `<div class="muscle-row${row.volume ? '' : ' none'}">
-            <div class="muscle-row-head"><span>${escapeHtml(row.group)}</span><span>${nl(row.volume)} kg · ${row.sets} sets</span></div>
+        ? rows.map(row => `<button type="button" class="muscle-row${row.volume ? '' : ' none'}" data-group="${escapeHtml(row.group)}">
+            <div class="muscle-row-head"><span>${escapeHtml(row.group)} ›</span><span>${nl(row.volume)} kg · ${row.sets} sets</span></div>
             <div class="muscle-bar"><span style="width:${peak ? Math.round(row.volume / peak * 100) : 0}%"></span></div>
-          </div>`).join('')
+          </button>`).join('')
         : '<div class="empty-state"><p>Nog geen sets in deze periode.</p></div>';
       const unassigned = data.unassigned.sets
         ? `<p class="text-muted">${data.unassigned.sets} sets horen bij oefeningen zonder spiergroep.</p>` : '';

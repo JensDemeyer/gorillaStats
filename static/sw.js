@@ -17,6 +17,7 @@ const SHELL = [
   '/static/js/body.js',
   '/static/js/dashboard.js',
   '/static/js/charts.js',
+  '/static/js/sessions.js',
   '/static/js/cardio.js',
   '/static/js/muscle-figure.js',
   '/static/js/muscles.js',

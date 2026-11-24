@@ -89,6 +89,24 @@ korte benen, grote handen). Opnieuw genereren kan met `pip install svgelements` 
 `python tools/build_muscle_figure.py`; het resultaat is `static/js/muscle-figure.js`. De kop is met de hand getekend
 in `static/js/muscles.js`.
 
+## Trainingskalender en trainingsdetails
+
+Onder de weekgrafiek staat de **Trainingskalender**: een rij per week (8, 12 of 26 weken) met zeven dagen. Elke dag toont
+het dagnummer en de letter van het schema (bv. P voor Push), kleurt op zwaarte (sets + ½ cardiominuut: licht tot 9,
+gemiddeld 10-19, zwaar vanaf 20), heeft een gouden stip bij cardio en een ring bij vandaag. Rechts staan de actieve
+dagen van die week (doel 3); de legende staat onder de kalender.
+
+**Tik op een dag** (of in **Recente trainingen**, of via *Overzicht van deze dag* in het trainingslog) voor het
+trainingsoverzicht: totalen (sets, volume, oefeningen, PR's), volume per spiergroep, per oefening alle sets met PR's,
+het beste set met e1RM en een vergelijking met de vorige keer, plus cardio en je gewicht van die dag. Met *Vorige* en
+*Volgende* blader je door je trainingsdagen en *Sets aanpassen* brengt je naar het trainingslog van die dag.
+API: `GET /api/sessions`, `GET /api/sessions/{datum}`.
+
+Bij **Spiergroepen** kun je op een groep tikken voor details per periode: de oefeningen met sets, volume, laatste keer en
+record, de recente PR's, het volume per week en de oefeningen waar de groep ondersteunend is.
+API: `GET /api/muscle-groups/{groep}?period=week|month|12w|all`. Op het tabblad **Gewicht** staat de grafiek bovenaan,
+vóór BMI, loggen en de Fitdays-import.
+
 ## Grafieken
 
 Elke grafiek (weekoverzicht, progressie per oefening en lichaamsmetingen) toont een voorbeeld met een

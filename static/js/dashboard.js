@@ -21,6 +21,7 @@ const Dashboard = (() => {
       data = next;
       render();
     } catch (error) {
+      console.error(error);
       const outdated = error.status === 404;
       document.getElementById('overviewTiles').innerHTML = `<div class="notice" role="alert">
         <strong>${outdated ? 'Server draait nog een oude versie' : 'Overzicht kon niet laden'}</strong>
@@ -33,7 +34,8 @@ const Dashboard = (() => {
   function render() {
     renderTiles();
     renderChart();
-    renderHeatmap();
+    renderCalendar();
+    Sessions.loadRecent(true);
     Body.renderCard(data.body, document.getElementById('bodyCardContent'));
   }
 
@@ -82,26 +84,52 @@ const Dashboard = (() => {
     weeksChart.update();
   }
 
-  function renderHeatmap() {
+  let calendarWeeks = (() => {
+    try { return [8, 12, 26].includes(Number(localStorage.getItem('gorilla-calendar-weeks'))) ? Number(localStorage.getItem('gorilla-calendar-weeks')) : 12; } catch (error) { return 12; }
+  })();
+
+  const localIso = day => `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+
+  function selectCalendarRange(element) {
+    calendarWeeks = Number(element.dataset.weeks);
+    try { localStorage.setItem('gorilla-calendar-weeks', String(calendarWeeks)); } catch (error) {}
+    if (data) renderCalendar();
+  }
+
+  // One row per week: the week's start, seven days (tap for the training) and the number of active days.
+  function renderCalendar() {
+    document.querySelectorAll('#calendarRange .chip').forEach(chip => chip.classList.toggle('active', Number(chip.dataset.weeks) === calendarWeeks));
     const byDate = new Map(data.calendar.map(day => [day.date, day]));
-    const today = new Date().toISOString().slice(0, 10);
-    const cells = [];
-    for (const week of data.weeks.slice(-12)) {
+    const today = localIso(new Date());
+    let lastMonth = null;
+    document.getElementById('calendar').innerHTML = data.weeks.slice(-calendarWeeks).map(week => {
       const start = new Date(`${week.start}T00:00:00`);
+      const month = start.toLocaleDateString('nl-NL', { month: 'short' });
+      const label = `<span class="cal-label">${month !== lastMonth ? `<b>${month}</b>` : ''}<span>${start.getDate()}</span></span>`;
+      lastMonth = month;
+      const cells = [];
       for (let offset = 0; offset < 7; offset++) {
         const day = new Date(start);
         day.setDate(start.getDate() + offset);
-        const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+        const iso = localIso(day);
         const entry = byDate.get(iso);
-        const score = entry ? entry.sets + entry.minutes / 2 : 0;
-        const level = !entry || !entry.active ? '' : score >= 20 ? ' l3' : score >= 10 ? ' l2' : ' l1';
-        const future = !entry && iso > today ? ' future' : '';
-        const title = entry ? `${iso}: ${entry.sets} sets${entry.minutes ? `, ${Math.round(entry.minutes)} min cardio` : ''}` : iso;
-        cells.push(`<span class="heat-cell${level}${future}" title="${title}"></span>`);
+        if (!entry) {
+          cells.push(`<span class="cal-day future"><i>${day.getDate()}</i></span>`);
+          continue;
+        }
+        const score = entry.sets + entry.minutes / 2;
+        const level = score >= 20 ? ' l3' : score >= 10 ? ' l2' : score > 0 ? ' l1' : '';
+        const initials = [...new Set((entry.routines || []).map(name => name.trim().charAt(0).toUpperCase()).filter(Boolean))].slice(0, 2).join('');
+        const cardio = entry.minutes > 0 ? ' cardio' : '';
+        const summary = entry.sets || entry.minutes
+          ? `${entry.sets ? `${entry.sets} sets, ${nl(entry.tonnage)} kg` : ''}${entry.sets && entry.minutes ? ' + ' : ''}${entry.minutes ? `${Math.round(entry.minutes)} min cardio` : ''}`
+          : 'rust';
+        cells.push(`<button type="button" class="cal-day${level}${cardio}${iso === today ? ' today' : ''}" data-open-session="${iso}"
+          aria-label="${iso}: ${summary}"><i>${day.getDate()}</i><small>${escapeHtml(initials)}</small></button>`);
       }
-    }
-    document.getElementById('heatmap').innerHTML = cells.join('');
+      return `<div class="cal-week">${label}${cells.join('')}<span class="cal-sum${week.active_days >= 3 ? ' goal' : ''}">${week.active_days}/3</span></div>`;
+    }).join('');
   }
 
-  return { load, selectWeekMetric };
+  return { load, selectWeekMetric, selectCalendarRange };
 })();

@@ -1097,11 +1097,16 @@ def get_dashboard(weeks: int = 12):
         for row in conn.execute(
             """SELECT date, COUNT(*) AS sets, COALESCE(SUM(weight * reps), 0) AS tonnage
                FROM logs WHERE date >= ? AND date <= ? GROUP BY date""", (first.isoformat(), today.isoformat())):
-            days[row["date"]] = {"sets": row["sets"], "tonnage": row["tonnage"], "minutes": 0.0, "kcal": 0}
+            days[row["date"]] = {"sets": row["sets"], "tonnage": row["tonnage"], "minutes": 0.0, "kcal": 0, "routines": []}
+        for row in conn.execute(
+            """SELECT l.date, GROUP_CONCAT(DISTINCT e.routine) AS routines
+               FROM logs l JOIN exercises e ON e.id = l.exercise_id
+               WHERE l.date >= ? AND l.date <= ? GROUP BY l.date""", (first.isoformat(), today.isoformat())):
+            days[row["date"]]["routines"] = (row["routines"] or "").split(",")
         for row in conn.execute(
             """SELECT date, SUM(duration_minutes) AS minutes, COALESCE(SUM(calories), 0) AS kcal
                FROM cardio_logs WHERE date >= ? AND date <= ? GROUP BY date""", (first.isoformat(), today.isoformat())):
-            day = days.setdefault(row["date"], {"sets": 0, "tonnage": 0, "minutes": 0.0, "kcal": 0})
+            day = days.setdefault(row["date"], {"sets": 0, "tonnage": 0, "minutes": 0.0, "kcal": 0, "routines": []})
             day["minutes"], day["kcal"] = row["minutes"], row["kcal"]
         body = body_summary(conn)
     finally:
@@ -1117,7 +1122,7 @@ def get_dashboard(weeks: int = 12):
             current = start + timedelta(days=offset)
             if current > today:
                 break
-            data = days.get(current.isoformat(), {"sets": 0, "tonnage": 0, "minutes": 0.0, "kcal": 0})
+            data = days.get(current.isoformat(), {"sets": 0, "tonnage": 0, "minutes": 0.0, "kcal": 0, "routines": []})
             active = active_day(data["sets"], data["minutes"])
             entry["active_days"] += int(active)
             entry["sets"] += data["sets"]
@@ -1125,7 +1130,7 @@ def get_dashboard(weeks: int = 12):
             entry["cardio_minutes"] += data["minutes"]
             entry["kcal"] += data["kcal"]
             calendar.append({"date": current.isoformat(), "active": active, "sets": data["sets"],
-                             "minutes": data["minutes"]})
+                             "minutes": data["minutes"], "tonnage": round(data["tonnage"]), "routines": data["routines"]})
         entry["tonnage"] = round(entry["tonnage"])
         entry["cardio_minutes"] = round(entry["cardio_minutes"])
         week_rows.append(entry)
@@ -1146,15 +1151,24 @@ def get_dashboard(weeks: int = 12):
     }
 
 
-@app.get("/api/muscles/stats")
-def get_muscle_stats(period: str = "week"):
-    """Training volume (weight x reps) and sets per muscle group; only primary muscles count."""
+def period_start(period: str) -> Optional[date]:
     today = date.today()
     monday = today - timedelta(days=today.weekday())
     starts = {"week": monday, "month": today.replace(day=1), "12w": monday - timedelta(weeks=11), "all": None}
     if period not in starts:
         raise HTTPException(422, "Ongeldige periode")
-    start = starts[period]
+    return starts[period]
+
+
+def primary_groups(value: Optional[str]) -> set:
+    return {MUSCLES[key][1] for key in parse_muscles(value) if MUSCLES[key][1]}
+
+
+@app.get("/api/muscles/stats")
+def get_muscle_stats(period: str = "week"):
+    """Training volume (weight x reps) and sets per muscle group; only primary muscles count."""
+    today = date.today()
+    start = period_start(period)
     conn = get_conn()
     try:
         rows = conn.execute(
@@ -1168,7 +1182,7 @@ def get_muscle_stats(period: str = "week"):
     totals = {group: {"volume": 0.0, "sets": 0} for group in MUSCLE_GROUPS}
     unassigned = {"volume": 0.0, "sets": 0}
     for row in rows:
-        groups = {MUSCLES[key][1] for key in parse_muscles(row["primary_muscles"]) if MUSCLES[key][1]}
+        groups = primary_groups(row["primary_muscles"])
         for group in groups or ():
             totals[group]["volume"] += row["volume"]
             totals[group]["sets"] += row["sets"]
@@ -1184,6 +1198,141 @@ def get_muscle_stats(period: str = "week"):
                     "relative": round(item["volume"] / peak, 3) if peak else 0}
                    for group, item in totals.items()],
         "total_volume": round(total), "unassigned": {"volume": round(unassigned["volume"]), "sets": unassigned["sets"]},
+    }
+
+
+def set_volume(weight, reps) -> float:
+    return weight * reps if weight is not None and reps is not None else 0.0
+
+
+@app.get("/api/sessions")
+def list_sessions(limit: int = 10, offset: int = 0):
+    """Training days (days with logged sets), newest first."""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT l.date, COUNT(*) AS sets, COALESCE(SUM(l.weight * l.reps), 0) AS volume,
+                      COUNT(DISTINCT l.exercise_id) AS exercises, COALESCE(SUM(l.is_pr), 0) AS prs,
+                      GROUP_CONCAT(DISTINCT e.routine) AS routines
+               FROM logs l JOIN exercises e ON e.id = l.exercise_id
+               GROUP BY l.date ORDER BY l.date DESC LIMIT ? OFFSET ?""",
+            (max(1, min(limit, 100)), max(0, offset))).fetchall()
+    finally:
+        conn.close()
+    return [{"date": row["date"], "sets": row["sets"], "volume": round(row["volume"]), "exercises": row["exercises"],
+             "prs": row["prs"], "routines": (row["routines"] or "").split(",")} for row in rows]
+
+
+@app.get("/api/sessions/{day}")
+def get_session(day: date):
+    """Everything done on one day: sets per exercise with PRs and a comparison with the previous time, cardio and weight."""
+    iso = day.isoformat()
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT l.id, l.exercise_id, e.name, e.routine, e.primary_muscles, l.set_nr, l.weight, l.reps, l.is_pr,
+                      l.is_estimated, l.single_arm, l.notes
+               FROM logs l JOIN exercises e ON e.id = l.exercise_id WHERE l.date = ? ORDER BY l.id""", (iso,)).fetchall()
+        exercises: dict = {}
+        for row in rows:
+            item = exercises.setdefault(row["exercise_id"], {
+                "exercise_id": row["exercise_id"], "name": row["name"], "routine": row["routine"],
+                "primary_muscles": parse_muscles(row["primary_muscles"]), "sets": [], "volume": 0.0, "prs": 0})
+            item["sets"].append({"id": row["id"], "set_nr": row["set_nr"], "weight": row["weight"], "reps": row["reps"],
+                                 "is_pr": bool(row["is_pr"]), "is_estimated": bool(row["is_estimated"]),
+                                 "single_arm": bool(row["single_arm"]), "notes": row["notes"]})
+            item["volume"] += set_volume(row["weight"], row["reps"])
+            item["prs"] += int(bool(row["is_pr"]))
+        group_totals: dict = {}
+        for item in exercises.values():
+            complete = [s for s in item["sets"] if s["weight"] is not None and s["reps"] is not None]
+            best = max(complete, key=lambda s: s["weight"] * (1 + s["reps"] / 30), default=None)
+            item["best"] = {"weight": best["weight"], "reps": best["reps"]} if best else None
+            item["e1rm"] = round(epley_e1rm(best["weight"], best["reps"]), 1) if best else None
+            item["volume"] = round(item["volume"])
+            previous = conn.execute(
+                """SELECT date, SUM(weight * reps) AS volume, MAX(weight) AS best_weight FROM logs
+                   WHERE exercise_id = ? AND date < ? AND weight IS NOT NULL AND reps IS NOT NULL AND is_estimated = 0
+                   GROUP BY date ORDER BY date DESC LIMIT 1""", (item["exercise_id"], iso)).fetchone()
+            item["previous"] = ({"date": previous["date"], "volume": round(previous["volume"]),
+                                 "best_weight": previous["best_weight"]} if previous else None)
+            for group in primary_groups(",".join(item["primary_muscles"])):
+                entry = group_totals.setdefault(group, {"group": group, "volume": 0, "sets": 0})
+                entry["volume"] += item["volume"]
+                entry["sets"] += len(item["sets"])
+        cardio = [dict(row) for row in conn.execute(
+            "SELECT type, duration_minutes, distance_km, calories FROM cardio_logs WHERE date = ? ORDER BY id", (iso,))]
+        weight = conn.execute("SELECT weight_kg FROM bodyweight_logs WHERE date = ?", (iso,)).fetchone()
+        days = "SELECT date FROM logs UNION SELECT date FROM cardio_logs"
+        previous_day = conn.execute(f"SELECT MAX(date) FROM ({days}) WHERE date < ?", (iso,)).fetchone()[0]
+        next_day = conn.execute(f"SELECT MIN(date) FROM ({days}) WHERE date > ?", (iso,)).fetchone()[0]
+    finally:
+        conn.close()
+    listed = list(exercises.values())
+    return {
+        "date": iso, "routines": list(dict.fromkeys(item["routine"] for item in listed)),
+        "totals": {"sets": len(rows), "volume": sum(item["volume"] for item in listed), "exercises": len(listed),
+                   "prs": sum(item["prs"] for item in listed)},
+        "exercises": listed, "groups": sorted(group_totals.values(), key=lambda entry: -entry["volume"]),
+        "cardio": cardio, "weight_kg": weight["weight_kg"] if weight else None,
+        "previous_date": previous_day, "next_date": next_day,
+    }
+
+
+@app.get("/api/muscle-groups/{group}")
+def get_muscle_group(group: str, period: str = "week"):
+    """Exercises, records and weekly volume for one muscle group (primary muscles only)."""
+    if group not in MUSCLE_GROUPS:
+        raise HTTPException(404, "Spiergroep niet gevonden")
+    start = period_start(period)
+    today = date.today()
+    conn = get_conn()
+    try:
+        members = {row["id"]: row for row in conn.execute("SELECT id, name, primary_muscles, secondary_muscles, active FROM exercises")
+                   if group in primary_groups(row["primary_muscles"])}
+        ids = list(members)
+        marks = ",".join("?" * len(ids))
+        exercises = []
+        if ids:
+            for row in conn.execute(
+                f"""SELECT exercise_id, COUNT(*) AS sets, COUNT(DISTINCT date) AS sessions, MAX(date) AS last_date,
+                           COALESCE(SUM(weight * reps), 0) AS volume, COALESCE(SUM(is_pr), 0) AS prs
+                    FROM logs WHERE exercise_id IN ({marks}) AND date <= ? AND (? IS NULL OR date >= ?)
+                    GROUP BY exercise_id""", (*ids, today.isoformat(), start and start.isoformat(), start and start.isoformat())):
+                record = conn.execute(
+                    """SELECT date, weight, reps FROM logs WHERE exercise_id = ? AND weight IS NOT NULL AND reps IS NOT NULL
+                       AND is_estimated = 0 ORDER BY weight * (1 + reps / 30.0) DESC, date DESC LIMIT 1""",
+                    (row["exercise_id"],)).fetchone()
+                exercises.append({
+                    "exercise_id": row["exercise_id"], "name": members[row["exercise_id"]]["name"], "sets": row["sets"],
+                    "sessions": row["sessions"], "volume": round(row["volume"]), "prs": row["prs"], "last_date": row["last_date"],
+                    "record": dict(record) if record else None})
+        recent_prs = [dict(row) for row in conn.execute(
+            f"""SELECT l.date, e.name, l.weight, l.reps FROM logs l JOIN exercises e ON e.id = l.exercise_id
+                WHERE l.is_pr = 1 AND l.exercise_id IN ({marks}) ORDER BY l.date DESC, l.id DESC LIMIT 8""", ids)] if ids else []
+        weekly: dict = {}
+        this_monday = today - timedelta(days=today.weekday())
+        first = this_monday - timedelta(weeks=11)
+        for week in range(12):
+            weekly[(first + timedelta(weeks=week)).isoformat()] = 0.0
+        if ids:
+            for row in conn.execute(
+                f"""SELECT date, COALESCE(SUM(weight * reps), 0) AS volume FROM logs
+                    WHERE exercise_id IN ({marks}) AND date >= ? AND date <= ? GROUP BY date""",
+                (*ids, first.isoformat(), today.isoformat())):
+                logged = date.fromisoformat(row["date"])
+                weekly[(logged - timedelta(days=logged.weekday())).isoformat()] += row["volume"]
+        supporting = sorted(row["name"] for row in conn.execute(
+            "SELECT name, secondary_muscles, primary_muscles FROM exercises WHERE active = 1")
+            if group in primary_groups(row["secondary_muscles"]) and group not in primary_groups(row["primary_muscles"]))
+    finally:
+        conn.close()
+    exercises.sort(key=lambda item: -item["volume"])
+    return {
+        "group": group, "period": period, "start": start.isoformat() if start else None,
+        "total_volume": sum(item["volume"] for item in exercises), "total_sets": sum(item["sets"] for item in exercises),
+        "exercises": exercises, "recent_prs": recent_prs, "supporting": supporting,
+        "weekly": [{"start": key, "volume": round(value)} for key, value in weekly.items()],
     }
 
 

@@ -729,8 +729,32 @@
       </div>
       <div class="chart-wrap tall"><canvas id="weeksChart"></canvas></div>
       <div class="chart-controls" id="weeksChartControls"></div>
-      <div class="heat" id="heatmap" role="img" aria-label="Activiteit van de afgelopen 12 weken"></div>
-      <div class="heat-key"><span>12 weken geleden</span><span>Vandaag</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🗓️ Trainingskalender</div>
+      <div id="calendarRange" class="chip-row">
+        <span class="chip" data-weeks="8" onclick="Dashboard.selectCalendarRange(this)">8 wkn</span>
+        <span class="chip active" data-weeks="12" onclick="Dashboard.selectCalendarRange(this)">12 wkn</span>
+        <span class="chip" data-weeks="26" onclick="Dashboard.selectCalendarRange(this)">26 wkn</span>
+      </div>
+      <div class="cal-days" aria-hidden="true"><span></span><span>Ma</span><span>Di</span><span>Wo</span><span>Do</span><span>Vr</span><span>Za</span><span>Zo</span><span>Dgn</span></div>
+      <div class="cal" id="calendar" aria-label="Trainingskalender: tik op een dag voor de training"></div>
+      <div class="cal-legend" aria-label="Legende">
+        <span><i class="cal-swatch"></i>Rust</span>
+        <span><i class="cal-swatch l1"></i>Licht</span>
+        <span><i class="cal-swatch l2"></i>Gemiddeld</span>
+        <span><i class="cal-swatch l3"></i>Zwaar</span>
+        <span><i class="cal-swatch cardio"></i>Cardio</span>
+        <span><i class="cal-swatch today"></i>Vandaag</span>
+      </div>
+      <p class="text-muted cal-note">Zwaarte = sets + ½ cardiominuut (licht tot 9, gemiddeld 10-19, zwaar vanaf 20). De letter is het schema van die dag. Rechts staan de actieve dagen van de week (doel 3). Tik op een dag voor de details.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🏋️ Recente trainingen</div>
+      <div id="recentSessions"><div class="empty-state"><p>Laden...</p></div></div>
+      <button type="button" class="btn btn-ghost btn-sm" id="moreSessions" onclick="Sessions.loadMore()" hidden>Meer trainingen</button>
     </div>
 
     <div class="card">
@@ -784,6 +808,7 @@
       <label for="logDate">Datum</label>
       <input type="date" id="logDate" onchange="loadTodayLog()">
       <button class="btn btn-ghost btn-sm" onclick="openBackfillWorkout()">+ Training toevoegen</button>
+      <button class="btn btn-ghost btn-sm" onclick="Sessions.open(document.getElementById('logDate').value)">📊 Overzicht van deze dag</button>
       <div id="todayLog">
         <div class="empty-state"><div class="icon">💤</div><p>Nog geen sets gelogd vandaag.</p></div>
       </div>
@@ -934,6 +959,16 @@
   ============================================================ -->
   <div class="page" id="page-bodyweight">
 
+    <!-- Weight chart -->
+    <div class="card">
+      <div class="card-title">📈 Lichaamsmetingen</div>
+      <label for="bwMetricSelect">Meetwaarde</label>
+      <select id="bwMetricSelect" onchange="renderBwChart()"><option value="weight_kg">Gewicht (kg)</option></select>
+      <div id="bwMetricSummary" class="text-muted" role="status" aria-live="polite" style="margin-bottom:10px"></div>
+      <div class="chart-wrap"><canvas id="bwChart"></canvas></div>
+      <div class="chart-controls" id="bwChartControls"></div>
+    </div>
+
     <div class="card">
       <div class="card-title">🧬 BMI &amp; Doel</div>
       <div id="bmiContent"></div>
@@ -980,16 +1015,6 @@
       <input type="file" id="csvFileInput" hidden onchange="importCSV()">
       <button class="btn btn-ghost" id="importCSVButton" onclick="document.getElementById('csvFileInput').click()">📂 CSV importeren</button>
       <div id="importResult" role="status" aria-live="polite" style="margin-top:10px;font-size:0.85rem;color:var(--text-dim);overflow-wrap:anywhere"></div>
-    </div>
-
-    <!-- Weight chart -->
-    <div class="card">
-      <div class="card-title">📈 Lichaamsmetingen</div>
-      <label for="bwMetricSelect">Meetwaarde</label>
-      <select id="bwMetricSelect" onchange="renderBwChart()"><option value="weight_kg">Gewicht (kg)</option></select>
-      <div id="bwMetricSummary" class="text-muted" role="status" aria-live="polite" style="margin-bottom:10px"></div>
-      <div class="chart-wrap"><canvas id="bwChart"></canvas></div>
-      <div class="chart-controls" id="bwChartControls"></div>
     </div>
 
   </div><!-- /bodyweight -->
@@ -1101,6 +1126,7 @@
 <script src="/static/js/journey.js"></script>
 <script src="/static/js/body.js"></script>
 <script src="/static/js/charts.js"></script>
+<script src="/static/js/sessions.js"></script>
 <script src="/static/js/dashboard.js"></script>
 <script src="/static/js/cardio.js"></script>
 <script src="/static/js/muscle-figure.js"></script>
@@ -1322,7 +1348,7 @@
 
   // Swipe left/right to change tab. Charts, inputs and scrollable rows never start a swipe.
   let tabSwipe = null;
-  const tabSwipeIgnore = 'input, select, textarea, canvas, .routine-chips, .jsel, .heat';
+  const tabSwipeIgnore = 'input, select, textarea, canvas, .routine-chips, .jsel';
 
   function swipeTab(direction) {
     const next = TAB_ORDER[TAB_ORDER.indexOf(currentTab()) + direction];

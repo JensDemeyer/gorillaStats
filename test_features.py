@@ -236,6 +236,45 @@ class BackendFeatureTests(unittest.TestCase):
                          [100, 200, 300, 400, 500])
         self.assertEqual(groups["Rug"], 0)
 
+    # --- training overview ---
+
+    def test_session_detail_lists_sets_prs_groups_and_neighbouring_days(self):
+        today = date.today()
+        earlier = (today - timedelta(days=7)).isoformat()
+        self.log(50, 10, earlier)
+        self.log(60, 10, today.isoformat(), 1)
+        self.log(60, 8, today.isoformat(), 2)
+        main.save_cardio(main.CardioEntry(type="Roeien", duration_minutes=15, log_date=today.isoformat()))
+        detail = main.get_session(today)
+        self.assertEqual(detail["totals"], {"sets": 2, "volume": 1080, "exercises": 1, "prs": detail["totals"]["prs"]})
+        self.assertGreaterEqual(detail["totals"]["prs"], 1)
+        exercise = detail["exercises"][0]
+        self.assertEqual((exercise["volume"], exercise["best"]), (1080, {"weight": 60, "reps": 10}))
+        self.assertEqual(exercise["previous"], {"date": earlier, "volume": 500, "best_weight": 50})
+        self.assertEqual([item["group"] for item in detail["groups"]], ["Borst"])
+        self.assertEqual(detail["cardio"][0]["type"], "Roeien")
+        self.assertEqual((detail["previous_date"], detail["next_date"]), (earlier, None))
+        self.assertEqual(main.get_session(today - timedelta(days=30))["totals"]["sets"], 0)
+
+    def test_session_list_and_calendar_show_routines(self):
+        today = date.today()
+        self.log(50, 10, today.isoformat())
+        sessions = main.list_sessions()
+        self.assertEqual((sessions[0]["date"], sessions[0]["sets"], sessions[0]["routines"]), (today.isoformat(), 1, ["Push"]))
+        entry = next(item for item in main.get_dashboard(weeks=4)["calendar"] if item["date"] == today.isoformat())
+        self.assertEqual((entry["routines"], entry["tonnage"]), (["Push"], 500))
+
+    def test_muscle_group_detail_lists_exercises_records_and_weekly_volume(self):
+        today = date.today().isoformat()
+        self.log(60, 10, today)
+        detail = main.get_muscle_group("Borst", "week")
+        self.assertEqual((detail["total_volume"], detail["total_sets"]), (600, 1))
+        self.assertEqual(detail["exercises"][0]["record"]["weight"], 60)
+        self.assertEqual(len(detail["weekly"]), 12)
+        self.assertEqual(detail["weekly"][-1]["volume"], 600)
+        with self.assertRaises(HTTPException):
+            main.get_muscle_group("Vleugels")
+
     # --- schema library ---
 
     def test_removed_exercises_move_to_the_library_and_can_return(self):
