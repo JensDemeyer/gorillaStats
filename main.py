@@ -1085,33 +1085,32 @@ def active_day(sets: int, minutes: float) -> bool:
     return sets >= 3 or minutes >= 10
 
 
-@app.get("/api/dashboard")
-def get_dashboard(weeks: int = 12):
-    weeks = max(4, min(weeks, 52))
-    today = date.today()
-    this_monday = today - timedelta(days=today.weekday())
-    first = this_monday - timedelta(weeks=weeks - 1)
-    conn = get_conn()
-    try:
-        days: dict = {}
-        for row in conn.execute(
-            """SELECT date, COUNT(*) AS sets, COALESCE(SUM(weight * reps), 0) AS tonnage
-               FROM logs WHERE date >= ? AND date <= ? GROUP BY date""", (first.isoformat(), today.isoformat())):
-            days[row["date"]] = {"sets": row["sets"], "tonnage": row["tonnage"], "minutes": 0.0, "kcal": 0, "routines": []}
-        for row in conn.execute(
-            """SELECT l.date, GROUP_CONCAT(DISTINCT e.routine) AS routines
-               FROM logs l JOIN exercises e ON e.id = l.exercise_id
-               WHERE l.date >= ? AND l.date <= ? GROUP BY l.date""", (first.isoformat(), today.isoformat())):
-            days[row["date"]]["routines"] = (row["routines"] or "").split(",")
-        for row in conn.execute(
-            """SELECT date, SUM(duration_minutes) AS minutes, COALESCE(SUM(calories), 0) AS kcal
-               FROM cardio_logs WHERE date >= ? AND date <= ? GROUP BY date""", (first.isoformat(), today.isoformat())):
-            day = days.setdefault(row["date"], {"sets": 0, "tonnage": 0, "minutes": 0.0, "kcal": 0, "routines": []})
-            day["minutes"], day["kcal"] = row["minutes"], row["kcal"]
-        body = body_summary(conn)
-    finally:
-        conn.close()
+def collect_days(conn: sqlite3.Connection, first: date, today: date) -> dict:
+    """Sets, volume, cardio minutes and routines per day between two dates."""
+    bounds = (first.isoformat(), today.isoformat())
+    days: dict = {}
 
+    def day(key: str) -> dict:
+        return days.setdefault(key, {"sets": 0, "tonnage": 0, "minutes": 0.0, "kcal": 0, "routines": []})
+
+    for row in conn.execute(
+        """SELECT date, COUNT(*) AS sets, COALESCE(SUM(weight * reps), 0) AS tonnage
+           FROM logs WHERE date >= ? AND date <= ? GROUP BY date""", bounds):
+        day(row["date"]).update(sets=row["sets"], tonnage=row["tonnage"])
+    for row in conn.execute(
+        """SELECT l.date, GROUP_CONCAT(DISTINCT e.routine) AS routines
+           FROM logs l JOIN exercises e ON e.id = l.exercise_id
+           WHERE l.date >= ? AND l.date <= ? GROUP BY l.date""", bounds):
+        day(row["date"])["routines"] = [name for name in (row["routines"] or "").split(",") if name]
+    for row in conn.execute(
+        """SELECT date, SUM(duration_minutes) AS minutes, COALESCE(SUM(calories), 0) AS kcal
+           FROM cardio_logs WHERE date >= ? AND date <= ? GROUP BY date""", bounds):
+        day(row["date"]).update(minutes=row["minutes"] or 0.0, kcal=row["kcal"])
+    return days
+
+
+def build_weeks(days: dict, first: date, weeks: int, today: date):
+    this_monday = today - timedelta(days=today.weekday())
     week_rows = []
     calendar = []
     for week in range(weeks):
@@ -1134,6 +1133,36 @@ def get_dashboard(weeks: int = 12):
         entry["tonnage"] = round(entry["tonnage"])
         entry["cardio_minutes"] = round(entry["cardio_minutes"])
         week_rows.append(entry)
+    return week_rows, calendar
+
+
+@app.get("/api/calendar")
+def get_calendar(weeks: int = 26):
+    """Lightweight data for the training calendar, so it does not depend on the heavier dashboard call."""
+    weeks = max(4, min(weeks, 52))
+    today = date.today()
+    first = today - timedelta(days=today.weekday()) - timedelta(weeks=weeks - 1)
+    conn = get_conn()
+    try:
+        days = collect_days(conn, first, today)
+    finally:
+        conn.close()
+    week_rows, calendar = build_weeks(days, first, weeks, today)
+    return {"weeks": [{"start": week["start"], "active_days": week["active_days"]} for week in week_rows], "calendar": calendar}
+
+
+@app.get("/api/dashboard")
+def get_dashboard(weeks: int = 12):
+    weeks = max(4, min(weeks, 52))
+    today = date.today()
+    first = today - timedelta(days=today.weekday()) - timedelta(weeks=weeks - 1)
+    conn = get_conn()
+    try:
+        days = collect_days(conn, first, today)
+        body = body_summary(conn)
+    finally:
+        conn.close()
+    week_rows, calendar = build_weeks(days, first, weeks, today)
 
     def month_total(start: date, end: date) -> dict:
         selected = [calendar_day for calendar_day in calendar if start.isoformat() <= calendar_day["date"] <= end.isoformat()]

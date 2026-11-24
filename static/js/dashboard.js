@@ -13,32 +13,49 @@ const Dashboard = (() => {
   ];
   const nl = value => Number(value).toLocaleString('nl-NL');
 
+  // The calendar and the recent trainings have their own small requests, so a slow or failing overview never blocks them.
+  let calendarData = null;
+  let calendarRequest = 0;
+
+  async function loadCalendar() {
+    const current = ++calendarRequest;
+    const container = document.getElementById('calendar');
+    try {
+      const next = await api('/api/calendar?weeks=26');
+      if (current !== calendarRequest) return;
+      calendarData = next;
+      renderCalendar();
+    } catch (error) {
+      if (current === calendarRequest && !calendarData) {
+        container.innerHTML = `<div class="notice" role="alert"><strong>Kalender kon niet laden</strong>
+          <span>${escapeHtml(error.message)}</span><button type="button" class="btn btn-ghost btn-sm" onclick="Dashboard.load()">Opnieuw proberen</button></div>`;
+      }
+    }
+  }
+
   async function load() {
     const current = ++request;
+    loadCalendar();
+    Sessions.loadRecent(true);
     try {
-      const next = await api('/api/dashboard?weeks=52');
+      const next = await api('/api/dashboard?weeks=52', { timeout: 30000 });
       if (current !== request) return;
       data = next;
-      render();
+      for (const step of [renderTiles, renderChart, () => Body.renderCard(data.body, document.getElementById('bodyCardContent'))]) {
+        try { step(); } catch (error) { console.error(error); }
+      }
     } catch (error) {
       console.error(error);
+      if (current !== request) return;
       const outdated = error.status === 404;
       document.getElementById('overviewTiles').innerHTML = `<div class="notice" role="alert">
         <strong>${outdated ? 'Server draait nog een oude versie' : 'Overzicht kon niet laden'}</strong>
         <span>${outdated
           ? 'Na een <code>git pull</code> moet de server op de Pi opnieuw starten (herstart de service of de Pi) voor de nieuwe grafieken en berekeningen.'
-          : 'Controleer de verbinding en probeer het opnieuw.'}</span></div>`;
+          : escapeHtml(error.message || 'Controleer de verbinding en probeer het opnieuw.')}</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="Dashboard.load()">Opnieuw proberen</button></div>`;
     }
   }
-
-  function render() {
-    renderTiles();
-    renderChart();
-    renderCalendar();
-    Sessions.loadRecent(true);
-    Body.renderCard(data.body, document.getElementById('bodyCardContent'));
-  }
-
   function renderTiles() {
     const weeks = data.weeks;
     const week = weeks[weeks.length - 1];
@@ -93,16 +110,16 @@ const Dashboard = (() => {
   function selectCalendarRange(element) {
     calendarWeeks = Number(element.dataset.weeks);
     try { localStorage.setItem('gorilla-calendar-weeks', String(calendarWeeks)); } catch (error) {}
-    if (data) renderCalendar();
+    if (calendarData) renderCalendar();
   }
 
   // One row per week: the week's start, seven days (tap for the training) and the number of active days.
   function renderCalendar() {
     document.querySelectorAll('#calendarRange .chip').forEach(chip => chip.classList.toggle('active', Number(chip.dataset.weeks) === calendarWeeks));
-    const byDate = new Map(data.calendar.map(day => [day.date, day]));
+    const byDate = new Map(calendarData.calendar.map(day => [day.date, day]));
     const today = localIso(new Date());
     let lastMonth = null;
-    document.getElementById('calendar').innerHTML = data.weeks.slice(-calendarWeeks).map(week => {
+    document.getElementById('calendar').innerHTML = calendarData.weeks.slice(-calendarWeeks).map(week => {
       const start = new Date(`${week.start}T00:00:00`);
       const month = start.toLocaleDateString('nl-NL', { month: 'short' });
       const label = `<span class="cal-label">${month !== lastMonth ? `<b>${month}</b>` : ''}<span>${start.getDate()}</span></span>`;

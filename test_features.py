@@ -264,6 +264,17 @@ class BackendFeatureTests(unittest.TestCase):
         entry = next(item for item in main.get_dashboard(weeks=4)["calendar"] if item["date"] == today.isoformat())
         self.assertEqual((entry["routines"], entry["tonnage"]), (["Push"], 500))
 
+    def test_calendar_endpoint_matches_the_dashboard_calendar(self):
+        today = date.today()
+        self.log(50, 10, today.isoformat())
+        main.save_cardio(main.CardioEntry(type="Roeien", duration_minutes=20, log_date=(today - timedelta(days=1)).isoformat()))
+        calendar = main.get_calendar(weeks=8)
+        dashboard = main.get_dashboard(weeks=8)
+        self.assertEqual(calendar["calendar"], dashboard["calendar"])
+        self.assertEqual([week["active_days"] for week in calendar["weeks"]], [week["active_days"] for week in dashboard["weeks"]])
+        yesterday = next(item for item in calendar["calendar"] if item["date"] == (today - timedelta(days=1)).isoformat())
+        self.assertEqual((yesterday["routines"], yesterday["minutes"]), ([], 20))
+
     def test_muscle_group_detail_lists_exercises_records_and_weekly_volume(self):
         today = date.today().isoformat()
         self.log(60, 10, today)

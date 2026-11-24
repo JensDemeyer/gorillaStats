@@ -137,7 +137,9 @@ const Sessions = (() => {
       offset += items.length;
       document.getElementById('moreSessions').hidden = items.length < PAGE;
     } catch (error) {
-      if (reset) list.innerHTML = '<div class="empty-state"><p>Trainingen konden niet laden.</p></div>';
+      if (reset) list.innerHTML = `<div class="notice" role="alert"><strong>Trainingen konden niet laden</strong>
+        <span>${escapeHtml(error.message)}</span><button type="button" class="btn btn-ghost btn-sm" onclick="Sessions.loadRecent(true)">Opnieuw proberen</button></div>`;
+      else toast(error.message);
     }
   }
 

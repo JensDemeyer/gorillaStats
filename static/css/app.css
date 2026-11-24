@@ -431,6 +431,7 @@
 .library-new .btn { width: auto; flex: 0 0 auto; margin: 0; }
 
 /* ===== Interactive charts ===== */
+[hidden] { display: none !important; }
 .chart-wrap.tappable { cursor: pointer; }
 .chart-wrap.tappable::after { content: '⤢'; position: absolute; top: 2px; right: 4px; padding: 2px 7px; border-radius: 8px; background: rgba(13,20,14,.75); color: var(--text-dim); font-size: .9rem; pointer-events: none; }
 .chart-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
