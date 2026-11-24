@@ -30,7 +30,7 @@ LEG_FROM = 700
 ARM_STRETCH = 1.2          # arms are long
 ARM_FROM = 400
 ARM_PULL = 0.3             # arms hang closer to the body
-HAND_SCALE = 1.4
+HAND_SCALE = 0.85
 FOOT_SCALE = 1.25
 
 
