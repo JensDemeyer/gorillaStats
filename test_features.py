@@ -217,6 +217,25 @@ class BackendFeatureTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             main.get_muscle_stats("decade")
 
+    def test_abs_are_a_statistics_group(self):
+        main.create_routine(main.RoutineUpdate(name="Buik", exercises=[main.RoutineExercise(name="Cable Crunch")]))
+        crunch = main.get_routines()["Buik"][0]
+        self.assertEqual(crunch["primary_muscles"], ["core"])
+        main.save_log(main.LogEntry(exercise_id=crunch["id"], set_nr=1, weight=30, reps=15))
+        groups = {item["group"]: item for item in main.get_muscle_stats("week")["groups"]}
+        self.assertEqual((groups["Buikspieren"]["volume"], groups["Buikspieren"]["sets"]), (450, 1))
+
+    def test_traps_lower_back_adductors_abductors_and_neck_have_their_own_group(self):
+        names = ["Dumbbell Shrugs", "Back extension", "Hip adduction (machine)", "Hip abduction (machine)", "Neck curl"]
+        main.create_routine(main.RoutineUpdate(name="Rest", exercises=[main.RoutineExercise(name=name) for name in names]))
+        today = date.today().isoformat()
+        for number, item in enumerate(main.get_routines()["Rest"], start=1):
+            main.save_log(main.LogEntry(exercise_id=item["id"], set_nr=1, weight=10 * number, reps=10, log_date=today))
+        groups = {item["group"]: item["volume"] for item in main.get_muscle_stats("week")["groups"]}
+        self.assertEqual([groups[group] for group in ("Trapezius", "Onderrug", "Adductoren", "Abductoren", "Nek")],
+                         [100, 200, 300, 400, 500])
+        self.assertEqual(groups["Rug"], 0)
+
     # --- schema library ---
 
     def test_removed_exercises_move_to_the_library_and_can_return(self):

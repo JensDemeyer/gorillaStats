@@ -70,8 +70,9 @@ voor verdere ontwikkeling; de desktopbrowser dient vooral voor lokale tests.
 ## Spiergroepen
 
 `exercises.primary_muscles` en `secondary_muscles` bevatten sleutels uit `MUSCLES` in `main.py` (fijn, bv.
-`chest_upper`, `lats`) die elk bij één statistiekgroep horen: Borst, Rug, Schouders, Biceps, Triceps,
-Onderarmen, Quadriceps, Hamstrings, Billen en Kuiten (core en adductoren tellen niet mee). Bij het starten
+`chest_upper`, `lats`) die elk bij één statistiekgroep horen: Borst, Rug (lats en midden-rug), Trapezius, Schouders,
+Biceps, Triceps, Onderarmen, Buikspieren, Onderrug, Quadriceps, Hamstrings, Billen, Abductoren, Adductoren, Kuiten en
+Nek. Bij het starten
 worden de oefeningen uit `EXERCISE_MUSCLES` ingevuld waar nog niets was ingesteld; wat je zelf kiest wordt nooit
 overschreven. Nieuwe oefeningen krijgen automatisch een suggestie als hun naam bekend is.
 

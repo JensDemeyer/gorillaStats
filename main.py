@@ -163,7 +163,7 @@ def init_db():
 # Muscle groups
 # ---------------------------------------------------------------------------
 
-# key -> (label, statistics group). Groups follow the app-wide list; core and adductors have none.
+# key -> (label, statistics group). A group can hold several muscles; "Rug" is lats and mid-back.
 MUSCLES = {
     "chest_upper": ("Borst (bovenste deel)", "Borst"),
     "chest": ("Borst", "Borst"),
@@ -175,19 +175,22 @@ MUSCLES = {
     "biceps": ("Biceps", "Biceps"),
     "triceps": ("Triceps", "Triceps"),
     "forearms": ("Onderarmen", "Onderarmen"),
-    "traps": ("Trapezius", "Rug"),
+    "traps": ("Trapezius", "Trapezius"),
     "lats": ("Brede rugspier (lats)", "Rug"),
     "mid_back": ("Midden-rug", "Rug"),
-    "lower_back": ("Onderrug", "Rug"),
-    "core": ("Core", None),
+    "lower_back": ("Onderrug", "Onderrug"),
+    "neck": ("Nek", "Nek"),
+    "core": ("Buikspieren (core)", "Buikspieren"),
     "quads": ("Quadriceps", "Quadriceps"),
     "glutes": ("Bilspieren", "Billen"),
+    "abductors": ("Abductoren (buitenkant heup)", "Abductoren"),
     "hamstrings": ("Hamstrings", "Hamstrings"),
-    "adductors": ("Adductoren", None),
+    "adductors": ("Adductoren (binnenkant dij)", "Adductoren"),
     "calves": ("Kuiten", "Kuiten"),
+    "tibialis": ("Scheenspier", "Kuiten"),
 }
-MUSCLE_GROUPS = ("Borst", "Rug", "Schouders", "Biceps", "Triceps", "Onderarmen",
-                 "Quadriceps", "Hamstrings", "Billen", "Kuiten")
+MUSCLE_GROUPS = ("Borst", "Rug", "Trapezius", "Schouders", "Biceps", "Triceps", "Onderarmen", "Buikspieren", "Onderrug",
+                 "Quadriceps", "Hamstrings", "Billen", "Abductoren", "Adductoren", "Kuiten", "Nek")
 
 # exercise name -> (primary, secondary) muscle keys, space separated
 EXERCISE_MUSCLES = {
@@ -221,6 +224,20 @@ EXERCISE_MUSCLES = {
     "Leg press (machine)": ("quads glutes", "hamstrings adductors"),
     "T-bar row": ("lats mid_back traps", "biceps shoulder_rear lower_back"),
     "Bicep curl single arm (cable)": ("biceps", "forearms"),
+    "Crunch": ("core", ""),
+    "Cable crunch": ("core", "lower_back"),
+    "Hanging leg raise": ("core", "forearms"),
+    "Leg raise": ("core", ""),
+    "Plank": ("core", "lower_back shoulder_front"),
+    "Ab wheel": ("core", "lats shoulder_front"),
+    "Hip abduction (machine)": ("abductors", "glutes"),
+    "Hip adduction (machine)": ("adductors", ""),
+    "Tibialis raise": ("tibialis", "calves"),
+    "Neck curl": ("neck", "traps"),
+    "Neck extension": ("neck", "traps"),
+    "Back extension": ("lower_back", "glutes hamstrings"),
+    "Hyperextension": ("lower_back", "glutes hamstrings"),
+    "Barbell shrugs": ("traps", "forearms"),
 }
 
 

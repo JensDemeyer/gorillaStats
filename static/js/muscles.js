@@ -7,13 +7,13 @@ const Muscles = (() => {
   // Which muscle keys colour a drawn muscle. A muscle without an entry is only part of the silhouette.
   const LIGHTS = {
     front: {
-      obliques: ['core'], abs: ['core'], biceps: ['biceps'], triceps: ['triceps'], trapezius: ['traps'],
+      obliques: ['core'], abs: ['core'], biceps: ['biceps'], triceps: ['triceps'], trapezius: ['traps'], neck: ['neck'],
       deltoids: ['shoulder_front', 'shoulder_side'], adductors: ['adductors'], quadriceps: ['quads'],
-      tibialis: ['calves'], calves: ['calves'], forearm: ['forearms'],
+      tibialis: ['tibialis', 'calves'], calves: ['calves'], forearm: ['forearms'],
     },
     back: {
-      trapezius: ['traps'], deltoids: ['shoulder_rear', 'shoulder_side', 'rotator_cuff'], 'upper-back': ['lats', 'mid_back'],
-      triceps: ['triceps'], 'lower-back': ['lower_back'], forearm: ['forearms'], gluteal: ['glutes'],
+      trapezius: ['traps'], neck: ['neck'], deltoids: ['shoulder_rear', 'shoulder_side', 'rotator_cuff'], 'upper-back': ['lats', 'mid_back'],
+      triceps: ['triceps'], 'lower-back': ['lower_back'], forearm: ['forearms'], gluteal: ['glutes', 'abductors'],
       adductors: ['adductors'], hamstring: ['hamstrings'], calves: ['calves'],
     },
   };
@@ -48,7 +48,9 @@ const Muscles = (() => {
   function figure({ primary = [], secondary = [], heat = null, tips = {} } = {}) {
     const stateOf = keys => {
       if (heat) {
-        const group = keys.map(groupOf).find(Boolean);
+        // A region that belongs to several groups (e.g. the glutes also carry the abductors) shows the busiest one.
+        const groups = [...new Set(keys.map(groupOf).filter(Boolean))];
+        const group = groups.reduce((best, item) => ((heat[item] || 0) > (heat[best] || 0) ? item : best), groups[0]);
         const value = group ? heat[group] || 0 : 0;
         return value > 0 ? { kind: 'heat', value, tip: `${group}: ${tips[group] || ''}` } : null;
       }
