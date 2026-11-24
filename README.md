@@ -96,11 +96,11 @@ het dagnummer en de letter van het schema (bv. P voor Push), kleurt op zwaarte (
 gemiddeld 10-19, zwaar vanaf 20), heeft een gouden stip bij cardio en een ring bij vandaag. Rechts staan de actieve
 dagen van die week (doel 3); de legende staat onder de kalender.
 
-**Tik op een dag** (of in **Recente trainingen**, of via *Overzicht van deze dag* in het trainingslog) voor het
+**Tik op een dag** (of via *Overzicht van deze dag* in het trainingslog) voor het
 trainingsoverzicht: totalen (sets, volume, oefeningen, PR's), volume per spiergroep, per oefening alle sets met PR's,
 het beste set met e1RM en een vergelijking met de vorige keer, plus cardio en je gewicht van die dag. Met *Vorige* en
 *Volgende* blader je door je trainingsdagen en *Sets aanpassen* brengt je naar het trainingslog van die dag.
-API: `GET /api/sessions`, `GET /api/sessions/{datum}`.
+API: `GET /api/calendar` (lichte kalenderdata) en `GET /api/sessions/{datum}`.
 
 Bij **Spiergroepen** kun je op een groep tikken voor details per periode: de oefeningen met sets, volume, laatste keer en
 record, de recente PR's, het volume per week en de oefeningen waar de groep ondersteunend is.

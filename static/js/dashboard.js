@@ -26,17 +26,18 @@ const Dashboard = (() => {
       calendarData = next;
       renderCalendar();
     } catch (error) {
-      if (current === calendarRequest && !calendarData) {
-        container.innerHTML = `<div class="notice" role="alert"><strong>Kalender kon niet laden</strong>
-          <span>${escapeHtml(error.message)}</span><button type="button" class="btn btn-ghost btn-sm" onclick="Dashboard.load()">Opnieuw proberen</button></div>`;
-      }
+      if (current !== calendarRequest) return;
+      console.error(error);
+      const outdated = error.status === 404;
+      container.innerHTML = `<div class="notice" role="alert"><strong>${outdated ? 'Server draait nog een oude versie' : 'Kalender kon niet laden'}</strong>
+        <span>${outdated ? 'Haal de nieuwste code op de Pi op (git pull) en herstart de service.' : escapeHtml(error.message || String(error))}</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="Dashboard.load()">Opnieuw proberen</button></div>`;
     }
   }
 
   async function load() {
     const current = ++request;
     loadCalendar();
-    Sessions.loadRecent(true);
     try {
       const next = await api('/api/dashboard?weeks=52', { timeout: 30000 });
       if (current !== request) return;

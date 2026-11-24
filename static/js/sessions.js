@@ -31,8 +31,6 @@ const Sheet = (() => {
 })();
 
 const Sessions = (() => {
-  const PAGE = 10;
-  let offset = 0;
   const nl = (value, digits = 0) => Number(value).toLocaleString('nl-NL', { maximumFractionDigits: digits });
   const long = iso => new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const short = iso => new Date(`${iso}T00:00:00`).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
@@ -115,38 +113,11 @@ const Sessions = (() => {
     if (editButton) edit(editButton.dataset.editDate);
   });
 
-  function row(item) {
-    const date = new Date(`${item.date}T00:00:00`);
-    return `<button type="button" class="session-row" data-open-session="${item.date}">
-      <span class="sr-date"><b>${date.getDate()}</b><span>${date.toLocaleDateString('nl-NL', { month: 'short' })}</span></span>
-      <span class="sr-main"><strong>${item.routines.map(escapeHtml).join(' + ') || 'Training'}</strong>
-        <small>${item.exercises} oefeningen · ${item.sets} sets · ${nl(item.volume)} kg</small></span>
-      ${item.prs ? `<span class="ss-pr">🏆 ${item.prs}</span>` : ''}
-    </button>`;
-  }
-
-  async function loadRecent(reset = true) {
-    const list = document.getElementById('recentSessions');
-    if (!list) return;
-    if (reset) offset = 0;
-    try {
-      const items = await api(`/api/sessions?limit=${PAGE}&offset=${offset}`);
-      if (!reset) list.insertAdjacentHTML('beforeend', items.map(row).join(''));
-      else list.innerHTML = items.length ? items.map(row).join('')
-        : '<div class="empty-state"><div class="icon">🦍</div><p>Nog geen trainingen gelogd.</p></div>';
-      offset += items.length;
-      document.getElementById('moreSessions').hidden = items.length < PAGE;
-    } catch (error) {
-      if (reset) list.innerHTML = `<div class="notice" role="alert"><strong>Trainingen konden niet laden</strong>
-        <span>${escapeHtml(error.message)}</span><button type="button" class="btn btn-ghost btn-sm" onclick="Sessions.loadRecent(true)">Opnieuw proberen</button></div>`;
-      else toast(error.message);
-    }
-  }
-
+  // Tapping a calendar day opens that training.
   document.addEventListener('click', event => {
     const button = event.target.closest('[data-open-session]');
     if (button) open(button.dataset.openSession);
   });
 
-  return { open, loadRecent, loadMore: () => loadRecent(false) };
+  return { open };
 })();

@@ -1234,24 +1234,6 @@ def set_volume(weight, reps) -> float:
     return weight * reps if weight is not None and reps is not None else 0.0
 
 
-@app.get("/api/sessions")
-def list_sessions(limit: int = 10, offset: int = 0):
-    """Training days (days with logged sets), newest first."""
-    conn = get_conn()
-    try:
-        rows = conn.execute(
-            """SELECT l.date, COUNT(*) AS sets, COALESCE(SUM(l.weight * l.reps), 0) AS volume,
-                      COUNT(DISTINCT l.exercise_id) AS exercises, COALESCE(SUM(l.is_pr), 0) AS prs,
-                      GROUP_CONCAT(DISTINCT e.routine) AS routines
-               FROM logs l JOIN exercises e ON e.id = l.exercise_id
-               GROUP BY l.date ORDER BY l.date DESC LIMIT ? OFFSET ?""",
-            (max(1, min(limit, 100)), max(0, offset))).fetchall()
-    finally:
-        conn.close()
-    return [{"date": row["date"], "sets": row["sets"], "volume": round(row["volume"]), "exercises": row["exercises"],
-             "prs": row["prs"], "routines": (row["routines"] or "").split(",")} for row in rows]
-
-
 @app.get("/api/sessions/{day}")
 def get_session(day: date):
     """Everything done on one day: sets per exercise with PRs and a comparison with the previous time, cardio and weight."""

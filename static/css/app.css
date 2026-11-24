@@ -199,13 +199,7 @@
 .cal-note { margin-top: 8px; font-size: .75rem; line-height: 1.4; }
 
 /* Recent trainings and the detail sheets */
-.session-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 2px; background: none; border: 0; border-bottom: 1px solid var(--border); color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.sr-date { display: grid; place-items: center; flex: 0 0 46px; padding: 4px 0; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 10px; line-height: 1.05; }
-.sr-date b { font: 900 1.25rem 'Barlow Condensed', sans-serif; color: var(--gold-bright); }
-.sr-date span { color: var(--text-muted); font-size: .65rem; text-transform: uppercase; }
-.sr-main { display: grid; min-width: 0; flex: 1; gap: 2px; overflow-wrap: anywhere; }
-.sr-main small, .ss-ex small, .gx-row small, .gx-pr small { color: var(--text-muted); font-size: .75rem; }
-#moreSessions { margin-top: 10px; }
+.ss-ex small, .gx-row small, .gx-pr small { color: var(--text-muted); font-size: .75rem; }
 .ss-pr { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: rgba(230,149,0,.18); border: 1px solid rgba(230,149,0,.5); color: var(--gold-bright); font-size: .75rem; font-style: normal; font-weight: 700; white-space: nowrap; }
 .sheet h3 { margin: 16px 0 8px; color: var(--gold); font: 800 .95rem 'Barlow Condensed', sans-serif; letter-spacing: 1.5px; text-transform: uppercase; }
 .sheet .chip-row { margin-bottom: 10px; }

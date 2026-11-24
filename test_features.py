@@ -256,11 +256,9 @@ class BackendFeatureTests(unittest.TestCase):
         self.assertEqual((detail["previous_date"], detail["next_date"]), (earlier, None))
         self.assertEqual(main.get_session(today - timedelta(days=30))["totals"]["sets"], 0)
 
-    def test_session_list_and_calendar_show_routines(self):
+    def test_calendar_days_show_routines_and_volume(self):
         today = date.today()
         self.log(50, 10, today.isoformat())
-        sessions = main.list_sessions()
-        self.assertEqual((sessions[0]["date"], sessions[0]["sets"], sessions[0]["routines"]), (today.isoformat(), 1, ["Push"]))
         entry = next(item for item in main.get_dashboard(weeks=4)["calendar"] if item["date"] == today.isoformat())
         self.assertEqual((entry["routines"], entry["tonnage"]), (["Push"], 500))
 
