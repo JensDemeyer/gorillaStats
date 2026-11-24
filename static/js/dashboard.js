@@ -2,16 +2,21 @@
 const Dashboard = (() => {
   let data = null;
   let metric = 'active_days';
-  let chart = null;
+  let weeksChart = null;
   let request = 0;
 
   const metricLabels = { active_days: 'Trainingsdagen', sets: 'Sets', tonnage: 'Volume (kg)', cardio_minutes: 'Cardio (min)' };
+  const metricUnits = { active_days: 'dagen', sets: 'sets', tonnage: 'kg', cardio_minutes: 'min' };
+  const WEEK_RANGES = [
+    { id: '4w', days: 28, label: '4 wkn' }, { id: '12w', days: 84, label: '12 wkn' },
+    { id: '26w', days: 182, label: '26 wkn' }, { id: '52w', days: 365, label: '1 jaar' },
+  ];
   const nl = value => Number(value).toLocaleString('nl-NL');
 
   async function load() {
     const current = ++request;
     try {
-      const next = await api('/api/dashboard?weeks=12');
+      const next = await api('/api/dashboard?weeks=52');
       if (current !== request) return;
       data = next;
       render();
@@ -56,46 +61,32 @@ const Dashboard = (() => {
     if (data) renderChart();
   }
 
-  function weekLabel(start) {
-    const date = new Date(`${start}T00:00:00`);
-    return `${date.getDate()}/${date.getMonth() + 1}`;
+  // The card shows the chosen period of the weekly series; Charts handles range, trend, forecast and the detail dialog.
+  function weeksModel() {
+    const weeks = data?.weeks || [];
+    return {
+      title: `Per week · ${metricLabels[metric]}`, label: metricLabels[metric], unit: metricUnits[metric], decimals: metric === 'active_days' ? 1 : 0,
+      kind: 'bar', span: 7 * 864e5, color: '#3a7d44', highlightLast: true, partialLast: true, zero: true, min: 0,
+      suggestedMax: metric === 'active_days' ? 4 : undefined, step: metric === 'active_days' ? 1 : undefined,
+      smoothOptions: [0, 2, 3, 4], ranges: WEEK_RANGES,
+      refLines: metric === 'active_days' ? [{ label: 'Weekdoel (3)', value: 3, color: '#d4a373' }] : [],
+      points: weeks.map(week => ({ t: new Date(`${week.start}T00:00:00`).getTime(), y: week[metric] })),
+    };
   }
 
   function renderChart() {
-    const weeks = data.weeks;
-    const values = weeks.map(week => week[metric]);
-    const datasets = [{
-      type: 'bar', label: metricLabels[metric], data: values, borderRadius: 6, maxBarThickness: 28,
-      backgroundColor: weeks.map(week => week.current ? '#e69500' : 'rgba(58,125,68,.85)'),
-      borderColor: weeks.map(week => week.current ? '#f5c04a' : '#4a9a56'), borderWidth: 1.5,
-    }];
-    if (metric === 'active_days') {
-      datasets.push({ type: 'line', label: 'Weekdoel (3)', data: weeks.map(() => 3), borderColor: '#d4a373', borderDash: [6, 4],
-        borderWidth: 2, pointRadius: 0, fill: false });
-    }
-    if (chart) chart.destroy();
-    chart = new Chart(document.getElementById('weeksChart').getContext('2d'), {
-      data: { labels: weeks.map(week => weekLabel(week.start)), datasets },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: metric === 'active_days', labels: { color: '#95a597', font: { family: 'Barlow', size: 12 }, boxWidth: 18 } },
-          tooltip: { callbacks: { title: items => `Week van ${weekLabel(weeks[items[0].dataIndex].start)}` } },
-        },
-        scales: {
-          y: { beginAtZero: true, suggestedMax: metric === 'active_days' ? 4 : undefined, grid: { color: 'rgba(45,63,48,0.5)' },
-            ticks: { color: '#95a597', font: { family: 'Barlow' }, precision: 0, stepSize: metric === 'active_days' ? 1 : undefined } },
-          x: { grid: { display: false }, ticks: { color: '#95a597', font: { family: 'Barlow', size: 10 } } },
-        },
-      },
+    weeksChart ||= Charts.mount({
+      id: 'weeks', canvas: document.getElementById('weeksChart'), controls: document.getElementById('weeksChartControls'),
+      model: weeksModel, defaults: { range: '12w' },
     });
+    weeksChart.update();
   }
 
   function renderHeatmap() {
     const byDate = new Map(data.calendar.map(day => [day.date, day]));
     const today = new Date().toISOString().slice(0, 10);
     const cells = [];
-    for (const week of data.weeks) {
+    for (const week of data.weeks.slice(-12)) {
       const start = new Date(`${week.start}T00:00:00`);
       for (let offset = 0; offset < 7; offset++) {
         const day = new Date(start);

@@ -728,6 +728,7 @@
         <span class="chip" data-metric="cardio_minutes" onclick="Dashboard.selectWeekMetric(this)">Cardio</span>
       </div>
       <div class="chart-wrap tall"><canvas id="weeksChart"></canvas></div>
+      <div class="chart-controls" id="weeksChartControls"></div>
       <div class="heat" id="heatmap" role="img" aria-label="Activiteit van de afgelopen 12 weken"></div>
       <div class="heat-key"><span>12 weken geleden</span><span>Vandaag</span></div>
     </div>
@@ -774,6 +775,7 @@
         <span class="chip" data-metric="total_volume" onclick="selectMetric(this)">Sessie Volume</span>
       </div>
       <div class="chart-wrap"><canvas id="progressChart"></canvas></div>
+      <div class="chart-controls" id="progressChartControls"></div>
     </div>
 
     <!-- Today log -->
@@ -987,6 +989,7 @@
       <select id="bwMetricSelect" onchange="renderBwChart()"><option value="weight_kg">Gewicht (kg)</option></select>
       <div id="bwMetricSummary" class="text-muted" role="status" aria-live="polite" style="margin-bottom:10px"></div>
       <div class="chart-wrap"><canvas id="bwChart"></canvas></div>
+      <div class="chart-controls" id="bwChartControls"></div>
     </div>
 
   </div><!-- /bodyweight -->
@@ -1097,8 +1100,10 @@
 <script src="/static/js/coach.js"></script>
 <script src="/static/js/journey.js"></script>
 <script src="/static/js/body.js"></script>
+<script src="/static/js/charts.js"></script>
 <script src="/static/js/dashboard.js"></script>
 <script src="/static/js/cardio.js"></script>
+<script src="/static/js/muscle-figure.js"></script>
 <script src="/static/js/muscles.js"></script>
 <script src="/static/js/nav.js"></script>
 <script>
@@ -1106,8 +1111,6 @@
   // STATE
   // ================================================================
   let routinesData = {};
-  let progressChartInst = null;
-  let bwChartInst = null;
   let bodyweightData = [];
   let bodyweightRequest = 0;
   let activeMetric = 'max_weight';
@@ -2307,54 +2310,32 @@
     loadProgressChart();
   }
 
+  let progressData = [];
+  let progressChart = null;
+  const progressMetricLabel = { max_weight: 'Max gewicht', best_e1rm: 'e1RM (Epley)', total_volume: 'Sessievolume' };
+
+  function progressModel() {
+    const select = document.getElementById('dashExerciseSelect');
+    const exercise = select.options[select.selectedIndex]?.textContent.split('›').pop().trim() || 'Oefening';
+    return {
+      title: `${exercise} · ${progressMetricLabel[activeMetric]}`, label: progressMetricLabel[activeMetric], unit: 'kg', decimals: 1,
+      kind: 'line', color: '#d4a373',
+      points: progressData.map(row => ({ t: new Date(`${row.date}T00:00:00`).getTime(), y: row[activeMetric] == null ? null : Number(row[activeMetric]) })),
+    };
+  }
+
   async function loadProgressChart() {
     const exId = document.getElementById('dashExerciseSelect').value;
     if (!exId) return;
 
     let data;
     try { data = await api(`/api/progress/${exId}`); } catch (error) { return; }
-    const labels = data.map(d => d.date);
-    const values = data.map(d => d[activeMetric] ? parseFloat(d[activeMetric]).toFixed(1) : null);
-
-    const metricLabel = { max_weight: 'Max Gewicht (kg)', best_e1rm: 'e1RM Epley (kg)', total_volume: 'Volume (kg)' };
-
-    if (progressChartInst) progressChartInst.destroy();
-    const ctx = document.getElementById('progressChart').getContext('2d');
-    progressChartInst = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [{
-          label: metricLabel[activeMetric],
-          data: values,
-          borderColor: '#d4a373',
-          backgroundColor: 'rgba(212,163,115,0.12)',
-          borderWidth: 2.5,
-          fill: true,
-          tension: 0.3,
-          pointBackgroundColor: '#e69500',
-          pointRadius: 4,
-          pointHoverRadius: 6,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { labels: { color: '#95a597', font: { family: 'Barlow', size: 12 } } }
-        },
-        scales: {
-          y: {
-            grid: { color: 'rgba(45,63,48,0.5)' },
-            ticks: { color: '#95a597', font: { family: 'Barlow' } }
-          },
-          x: {
-            grid: { color: 'rgba(45,63,48,0.3)' },
-            ticks: { color: '#95a597', font: { family: 'Barlow', size: 11 }, maxRotation: 45 }
-          }
-        }
-      }
+    progressData = data;
+    progressChart ||= Charts.mount({
+      id: 'progress', canvas: document.getElementById('progressChart'), controls: document.getElementById('progressChartControls'),
+      model: progressModel, defaults: { range: '6m' },
     });
+    progressChart.update();
   }
 
   // ================================================================
@@ -2461,60 +2442,47 @@
     }
   }
 
-  function renderBwChart() {
-    const selected = document.getElementById('bwMetricSelect').value;
+  let bwChart = null;
+
+  function bodyModel() {
+    const selected = document.getElementById('bwMetricSelect').value || 'weight_kg';
     const body = Body.summary;
     const heightM = (body?.height_cm || 190) / 100;
     const calcBmi = selected === 'bmi_calc';
     const metric = calcBmi ? { label: 'BMI (berekend)', unit: '' }
       : bodyweightData.map(row => row.metrics?.[selected]).find(Boolean) || { label: 'Gewicht', unit: 'kg' };
-    const values = bodyweightData.map(row => calcBmi
-      ? Math.round(row.weight_kg / heightM ** 2 * 10) / 10
-      : row.metrics?.[selected]?.value ?? (selected === 'weight_kg' ? row.weight_kg : null));
-    const valid = values.flatMap((value, index) => value == null ? [] : [{ value, date: bodyweightData[index].date }]);
+    const points = bodyweightData.flatMap(row => {
+      const value = calcBmi ? Math.round(row.weight_kg / heightM ** 2 * 10) / 10
+        : row.metrics?.[selected]?.value ?? (selected === 'weight_kg' ? row.weight_kg : null);
+      return value == null ? [] : [{ t: new Date(`${row.date}T00:00:00`).getTime(), y: value }];
+    });
+    const refLines = [];
+    let goal = null;
+    if (selected === 'weight_kg' && body) {
+      if (body.goal_weight_kg != null) {
+        refLines.push({ label: `Doel (${body.goal_weight_kg} kg)`, value: body.goal_weight_kg, color: '#e69500' });
+        goal = { value: body.goal_weight_kg };
+      }
+      refLines.push({ label: `Gezond max (${body.healthy_max_kg} kg)`, value: body.healthy_max_kg, color: 'rgba(212,163,115,0.7)' });
+    } else if (calcBmi) {
+      refLines.push({ label: 'Gezond max (24,9)', value: 24.9, color: 'rgba(212,163,115,0.7)' });
+    }
+    return { title: metric.label, label: metric.label, unit: metric.unit, decimals: 1, kind: 'line', color: '#84bf82',
+      points, refLines, goal };
+  }
+
+  function renderBwChart() {
+    const model = bodyModel();
+    const valid = model.points;
     const summary = document.getElementById('bwMetricSummary');
     summary.textContent = valid.length
-      ? `${valid.at(-1).value.toLocaleString('nl-NL')} ${metric.unit} · ${valid.at(-1).date} · ${valid.length} ${valid.length === 1 ? 'meting' : 'metingen'}`
+      ? `${valid.at(-1).y.toLocaleString('nl-NL')} ${model.unit} · ${new Date(valid.at(-1).t).toISOString().slice(0, 10)} · ${valid.length} ${valid.length === 1 ? 'meting' : 'metingen'}`
       : 'Geen meetwaarden beschikbaar';
-    const labels = bodyweightData.map(row => row.date);
-    const datasets = [{ label: `${metric.label}${metric.unit ? ` (${metric.unit})` : ''}`, data: values,
-      borderColor: '#84bf82', backgroundColor: 'rgba(132,191,130,0.08)', borderWidth: 2,
-      fill: true, tension: 0.2, pointRadius: valid.length < 2 ? 5 : 3, spanGaps: false }];
-    const reference = (label, value, color) => datasets.push({ label, data: labels.map(() => value), borderColor: color,
-      borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false });
-    if (selected === 'weight_kg' && body) {
-      if (body.goal_weight_kg != null) reference(`Doel (${body.goal_weight_kg} kg)`, body.goal_weight_kg, '#e69500');
-      reference(`Gezond max (${body.healthy_max_kg} kg)`, body.healthy_max_kg, 'rgba(212,163,115,0.7)');
-    } else if (calcBmi) {
-      reference('Gezond max (24,9)', 24.9, 'rgba(212,163,115,0.7)');
-    }
-    if (bwChartInst) bwChartInst.destroy();
-    const ctx = document.getElementById('bwChart').getContext('2d');
-    bwChartInst = new Chart(ctx, {
-      type: 'line',
-      data: { labels, datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: {
-          legend: { labels: { color: '#95a597', font: { family: 'Barlow', size: 12 } } }
-        },
-        scales: {
-          y: {
-            type: 'linear',
-            position: 'left',
-            grid: { color: 'rgba(45,63,48,0.5)' },
-            ticks: { color: '#95a597', font: { family: 'Barlow' } },
-            title: { display: Boolean(metric.unit), text: metric.unit, color: '#95a597' }
-          },
-          x: {
-            grid: { color: 'rgba(45,63,48,0.3)' },
-            ticks: { color: '#95a597', font: { family: 'Barlow', size: 10 }, maxRotation: 45, maxTicksLimit: 10 }
-          }
-        }
-      }
+    bwChart ||= Charts.mount({
+      id: 'body', canvas: document.getElementById('bwChart'), controls: document.getElementById('bwChartControls'),
+      model: bodyModel, defaults: { range: '6m' },
     });
+    bwChart.update();
   }
 
   // ================================================================

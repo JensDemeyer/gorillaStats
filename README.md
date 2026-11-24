@@ -80,6 +80,29 @@ het aantal sets per groep, met een gorilla als heatmap. Alleen primaire spieren 
 twee primaire groepen (bv. squat: quadriceps en billen), dan krijgt elke groep het volledige volume, en een
 groep telt maar één keer per oefening. API: `GET /api/muscles`, `GET /api/muscles/stats?period=week|month|12w|all`.
 
+De figuur is een gorilla (voor- en achterkant) met alle spieren apart: tik op een spier voor de naam, en bij de
+statistieken ook het volume. De spiercontouren komen uit
+[react-native-body-highlighter](https://github.com/HichamELBSI/react-native-body-highlighter) (MIT-licentie,
+© 2022 Hicham Elabbassi) en zijn omgevormd naar gorillaverhoudingen (brede borst en schouders, lange dikke armen,
+korte benen, grote handen). Opnieuw genereren kan met `pip install svgelements` en
+`python tools/build_muscle_figure.py`; het resultaat is `static/js/muscle-figure.js`. De kop is met de hand getekend
+in `static/js/muscles.js`.
+
+## Grafieken
+
+Elke grafiek (weekoverzicht, progressie per oefening en lichaamsmetingen) toont een voorbeeld met een
+periodekeuze. **Tik op de grafiek** (of op **Grafiek openen**) voor het detailscherm:
+
+- periode (1 maand tot alles; bij weekgrafieken 4 weken tot 1 jaar),
+- gladstrijken (voortschrijdend gemiddelde), trendlijn en hoogste/laagste punt,
+- **voorspelling** voor 4, 8 of 12 weken met een band die breder wordt, gebaseerd op de laatste 8 weken
+	(bij een weekgrafiek zonder de lopende week); bij gewicht met doel ook de verwachte datum waarop je het doel haalt,
+- statistieken (laatst, gemiddeld, hoogste, laagste, verandering, trend per week),
+- tik of sleep over de grafiek voor de waarde van een datum.
+
+De keuzes blijven per grafiek op je gsm bewaard. De code staat in `static/js/charts.js`; een nieuwe grafiek maak je met
+`Charts.mount({ id, canvas, controls, model })`.
+
 ## Gewicht, BMI en doel
 
 Op het tabblad **Gewicht** staat je BMI met een kleurenschaal, het gezonde
