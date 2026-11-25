@@ -53,7 +53,7 @@ const Sessions = (() => {
     const muscles = item.primary_muscles.length ? Muscles.labels(item.primary_muscles) : '';
     return `<section class="ss-ex">
       <div class="ss-ex-head"><strong>${escapeHtml(item.name)}</strong>${item.prs ? `<span class="ss-pr">🏆 ${item.prs}</span>` : ''}</div>
-      <small>${escapeHtml(item.routine)}${muscles ? ` · ${escapeHtml(muscles)}` : ''}</small>
+      <small>${escapeHtml(displayRoutine(item.routine))}${muscles ? ` · ${escapeHtml(muscles)}` : ''}</small>
       <ul class="ss-sets">${item.sets.map(setLine).join('')}</ul>
       <div class="ss-foot"><span>Volume <b>${nl(item.volume)} kg</b></span>${best ? `<span>${best}</span>` : ''}<span>${compare}</span></div>
     </section>`;
@@ -80,7 +80,7 @@ const Sessions = (() => {
       data.cardio.map(item => `<li><span>${escapeHtml(item.type)}</span><strong>${nl(item.duration_minutes)} min</strong>${
         item.distance_km ? `<em>${nl(item.distance_km, 1)} km</em>` : ''}${item.calories ? `<em>${nl(item.calories)} kcal</em>` : ''}</li>`).join('')}</ul></section>` : '';
     return `${nav}
-      ${data.routines.length ? `<div class="chip-row">${data.routines.map(name => `<span class="chip active">${escapeHtml(name)}</span>`).join('')}</div>` : ''}
+      ${data.routines.length ? `<div class="chip-row">${data.routines.map(name => `<span class="chip active">${escapeHtml(displayRoutine(name))}</span>`).join('')}</div>` : ''}
       <div class="cd-stats">${tiles.map(([name, value]) => `<div><span>${name}</span><strong>${value}</strong></div>`).join('')}</div>
       ${groups}${data.exercises.map(exerciseBlock).join('')}${cardio}
       ${data.exercises.length ? `<button type="button" class="btn btn-ghost" data-edit-date="${data.date}">✎ Sets aanpassen</button>` : ''}`;

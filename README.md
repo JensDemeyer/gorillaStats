@@ -6,7 +6,7 @@ voor verdere ontwikkeling; de desktopbrowser dient vooral voor lokale tests.
 
 ## Bestaande functionaliteit
 
-- Push/Pull/Legs-routines en eigen oefeningen.
+- 🅿️ush/Pull/Legs-routines en eigen oefeningen.
 - Sets, gewicht, herhalingen, notities, vorige sessie en PR-detectie.
 - Rusttimer, dagoverzicht en progressiegrafieken.
 - Cardio in etappes en lichaamsgewicht met BMI en doelgewicht, inclusief Fitdays CSV-import.
@@ -28,7 +28,7 @@ voor verdere ontwikkeling; de desktopbrowser dient vooral voor lokale tests.
 
 ## Tijdens Je Training
 
-- Kies bovenaan het schema (Push, Pull, Legs, ...) en daarna de oefening.
+- Kies bovenaan het schema (🅿️ush, Pull, Legs, ...) en daarna de oefening.
 - Gewicht en reps staan al ingevuld: de laatst gelogde set van vandaag, anders
 	dezelfde set van de vorige sessie. Met **−** en **+** pas je ze snel aan; tik op
 	de staplengte (±2,5) om te wisselen tussen 0,5, 1,25, 2,5 en 5 kg. Tik je in een
@@ -92,15 +92,16 @@ in `static/js/muscles.js`.
 ## Trainingskalender en trainingsdetails
 
 Onder de weekgrafiek staat de **Trainingskalender**: een rij per week (8, 12 of 26 weken) met zeven dagen. Elke dag toont
-het dagnummer en de letter van het schema (bv. P voor Push), kleurt op zwaarte (sets + ½ cardiominuut: licht tot 9,
-gemiddeld 10-19, zwaar vanaf 20), heeft een gouden stip bij cardio en een ring bij vandaag. Rechts staan de actieve
-dagen van die week (doel 3); de legende staat onder de kalender.
+het dagnummer en de letter van het schema (🅿️ voor 🅿️ush, P voor Pull). Dagen met sets of cardio hebben dezelfde kleur,
+met een gouden stip bij cardio en een ring bij vandaag. Rechts staan de actieve dagen van die week (doel 3);
+de legende staat onder de kalender. De schemanaam wordt alleen anders weergegeven; opgeslagen namen blijven ongewijzigd.
 
 **Tik op een dag** (of via *Overzicht van deze dag* in het trainingslog) voor het
 trainingsoverzicht: totalen (sets, volume, oefeningen, PR's), volume per spiergroep, per oefening alle sets met PR's,
 het beste set met e1RM en een vergelijking met de vorige keer, plus cardio en je gewicht van die dag. Met *Vorige* en
 *Volgende* blader je door je trainingsdagen en *Sets aanpassen* brengt je naar het trainingslog van die dag.
 API: `GET /api/calendar` (lichte kalenderdata) en `GET /api/sessions/{datum}`.
+De frontendtests voor kalender en schemanamen draaien met `node --test test_dashboard.js` (Node.js vereist).
 
 Bij **Spiergroepen** kun je op een groep tikken voor details per periode: de oefeningen met sets, volume, laatste keer en
 record, de recente PR's, het volume per week en de oefeningen waar de groep ondersteunend is.
@@ -264,7 +265,7 @@ dagen zonder logs op met geschatte sessies. Alleen de Python-standaardbibliothee
 is nodig. Het script gebruikt jouw eigen echte (niet-geschatte) logs als referentie.
 
 - Dagen die al logs hebben blijven onaangeroerd.
-- De routine volgt Push → Pull → Legs na de vorige gelogde dag, en vermijdt
+- De routine volgt 🅿️ush → Pull → Legs na de vorige gelogde dag, en vermijdt
 	dezelfde routine als de eerstvolgende echte dag.
 - Per routine komen enkel oefeningen die in minstens de helft van je echte
 	sessies zitten, met je gebruikelijke aantal sets.

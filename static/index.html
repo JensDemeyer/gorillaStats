@@ -742,13 +742,11 @@
       <div class="cal" id="calendar" aria-label="Trainingskalender: tik op een dag voor de training"></div>
       <div class="cal-legend" aria-label="Legende">
         <span><i class="cal-swatch"></i>Rust</span>
-        <span><i class="cal-swatch l1"></i>Licht</span>
-        <span><i class="cal-swatch l2"></i>Gemiddeld</span>
-        <span><i class="cal-swatch l3"></i>Zwaar</span>
+        <span><i class="cal-swatch active"></i>Training</span>
         <span><i class="cal-swatch cardio"></i>Cardio</span>
         <span><i class="cal-swatch today"></i>Vandaag</span>
+        <span>🅿️ = 🅿️ush · P = Pull</span>
       </div>
-      <p class="text-muted cal-note">Zwaarte = sets + ½ cardiominuut (licht tot 9, gemiddeld 10-19, zwaar vanaf 20). De letter is het schema van die dag. Rechts staan de actieve dagen van de week (doel 3). Tik op een dag voor de details.</p>
     </div>
 
     <div class="card">
@@ -1082,7 +1080,7 @@
     <label>Schema</label>
     <div class="routine-chips editor-chips" id="editorChips"></div>
     <label for="editRoutineName">Naam schema</label>
-    <input id="editRoutineName" required type="text" placeholder="bv. Push, Armen, Full body">
+    <input id="editRoutineName" required type="text" placeholder="bv. 🅿️ush, Armen, Full body">
     <label>⭐ Vaste oefeningen in dit schema</label>
     <div id="routineRows"></div>
     <button class="btn btn-ghost btn-sm" type="button" onclick="addRoutineRow()">+ Oefening</button>
@@ -1154,6 +1152,10 @@
   const logsById = new Map();
   try { soundEnabled = localStorage.getItem('gorilla-sound') === 'on'; } catch (error) {}
   const rewardIcons = { flag: '🚩', flame: '🔥', medal: '🏅', crown: '👑', dumbbell: '💪', trophy: '🏆', heart: '❤️', chart: '📈' };
+
+  function displayRoutine(name) {
+    return name.replace(/^push\b/i, '🅿️ush');
+  }
 
   function updateSoundButton() {
     const button = document.getElementById('soundToggle');
@@ -1399,7 +1401,7 @@
     const routine = preferredRoutine || routineSelect.value;
     const exercise = preferredExercise || document.getElementById('exerciseSelect').value;
     routineSelect.innerHTML = Object.keys(routinesData)
-      .map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+      .map(r => `<option value="${escapeHtml(r)}">${escapeHtml(displayRoutine(r))}</option>`).join('');
     if (routinesData[routine]) routineSelect.value = routine;
 
     await onRoutineChange(exercise);
@@ -1409,7 +1411,7 @@
   function populateDashExerciseSelect() {
     const sel = document.getElementById('dashExerciseSelect');
     const all = Object.values(routinesData).flat();
-    sel.innerHTML = all.map(e => `<option value="${e.id}">${escapeHtml(e.routine)} › ${escapeHtml(e.name)}</option>`).join('');
+    sel.innerHTML = all.map(e => `<option value="${e.id}">${escapeHtml(displayRoutine(e.routine))} › ${escapeHtml(e.name)}</option>`).join('');
   }
 
   // ================================================================
@@ -1428,7 +1430,7 @@
   function renderRoutineChips() {
     const current = document.getElementById('routineSelect').value;
     document.getElementById('routineChips').innerHTML = Object.keys(routinesData).map(name =>
-      `<button type="button" class="routine-chip${name === current ? ' active' : ''}" role="tab" aria-selected="${name === current}" data-routine="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join('');
+      `<button type="button" class="routine-chip${name === current ? ' active' : ''}" role="tab" aria-selected="${name === current}" data-routine="${escapeHtml(name)}">${escapeHtml(displayRoutine(name))}</button>`).join('');
   }
 
   document.getElementById('routineChips').addEventListener('click', event => {
@@ -1873,7 +1875,7 @@
       secondary_muscles: [...(ex.secondary_muscles || [])], single_arm_option: Boolean(ex.single_arm_option), touched: false,
     })) : [{ name: '' }];
     if (!routineDraft.length) routineDraft = [{ name: '' }];
-    document.getElementById('editRoutineName').value = name;
+    document.getElementById('editRoutineName').value = displayRoutine(name);
     renderEditorChips();
     renderRoutineRows();
     loadLibrary();
@@ -1900,7 +1902,7 @@
       <div class="library-row">
         <div class="library-info">
           <strong>${escapeHtml(item.name)}</strong>
-          <small>${[item.former_routine ? `uit ${escapeHtml(item.former_routine)}` : '', item.sets ? `${item.sets} sets historiek` : '',
+          <small>${[item.former_routine ? `uit ${escapeHtml(displayRoutine(item.former_routine))}` : '', item.sets ? `${item.sets} sets historiek` : '',
             escapeHtml(Muscles.labels(item.primary_muscles || []))].filter(Boolean).join(' · ')}</small>
         </div>
         <button type="button" class="btn btn-ghost btn-sm" onclick="addFromLibrary(${item.id})" aria-label="${escapeHtml(item.name)} toevoegen aan schema">＋ Schema</button>
@@ -1939,7 +1941,7 @@
 
   function renderEditorChips() {
     document.getElementById('editorChips').innerHTML = Object.keys(routinesData).map(name =>
-      `<button type="button" class="routine-chip${name === editingRoutine ? ' active' : ''}" data-editor-routine="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join('')
+      `<button type="button" class="routine-chip${name === editingRoutine ? ' active' : ''}" data-editor-routine="${escapeHtml(name)}">${escapeHtml(displayRoutine(name))}</button>`).join('')
       + `<button type="button" class="routine-chip new${editingRoutine === '' ? ' active' : ''}" data-editor-new>＋ Nieuw</button>`;
   }
 
@@ -2028,7 +2030,10 @@
     event.preventDefault();
     const button = document.getElementById('saveRoutineButton');
     if (button.disabled) return;
-    const name = document.getElementById('editRoutineName').value.trim();
+    const displayedName = document.getElementById('editRoutineName').value.trim();
+    const originalPush = editingRoutine.match(/^push\b/i);
+    const name = originalPush && displayedName.startsWith('🅿️ush')
+      ? originalPush[0] + displayedName.slice('🅿️ush'.length) : displayedName;
     if (!name || routineDraft.some(ex => !ex.name.trim())) { toast('Vul alle namen in.'); return; }
     button.disabled = true;
     try {
@@ -2043,7 +2048,7 @@
       });
       await loadRoutines(name);
       document.getElementById('routineEditor').close();
-      toast(creating ? `✅ Schema "${name}" aangemaakt` : 'Schema opgeslagen');
+      toast(creating ? `✅ Schema "${displayRoutine(name)}" aangemaakt` : 'Schema opgeslagen');
     } catch (error) { toast(error.message); }
     finally { button.disabled = false; }
   }
@@ -2131,7 +2136,7 @@
     document.getElementById('editLogDate').value = log.date;
     const exercises = Object.values(routinesData).flat();
     if (!exercises.some(ex => ex.id === log.exercise_id)) exercises.push({ id: log.exercise_id, name: log.exercise_name, routine: 'Historiek' });
-    document.getElementById('editLogExercise').innerHTML = exercises.map(ex => `<option value="${ex.id}">${escapeHtml(ex.routine)} › ${escapeHtml(ex.name)}</option>`).join('');
+    document.getElementById('editLogExercise').innerHTML = exercises.map(ex => `<option value="${ex.id}">${escapeHtml(displayRoutine(ex.routine))} › ${escapeHtml(ex.name)}</option>`).join('');
     document.getElementById('editLogExercise').value = log.exercise_id;
     document.getElementById('editWeight').value = log.weight ?? '';
     document.getElementById('editEstimated').checked = Boolean(log.is_estimated);
@@ -2209,7 +2214,7 @@
       const routineSelect = document.getElementById('backfillRoutine');
       const selectedRoutine = routineSelect.value;
       routineSelect.innerHTML = '<option value="">Alle schema\'s</option>' + [...new Set(suggestions.map(ex => ex.routine))]
-        .map(routine => `<option value="${escapeHtml(routine)}">${escapeHtml(routine)}</option>`).join('');
+        .map(routine => `<option value="${escapeHtml(routine)}">${escapeHtml(displayRoutine(routine))}</option>`).join('');
       if ([...routineSelect.options].some(option => option.value === selectedRoutine)) routineSelect.value = selectedRoutine;
       renderBackfillExercises();
     } catch (error) {
@@ -2223,7 +2228,7 @@
       const values = selected || { sets: Math.min(20, ex.sets), weight: ex.weight, reps: null, is_estimated: ex.weight != null };
       return `<div class="backfill-exercise" data-exercise-id="${ex.exercise_id}">
         <label class="selection-label"><input type="checkbox" ${selected ? 'checked' : ''} onchange="toggleBackfillExercise(${ex.exercise_id}, this.checked)">${escapeHtml(ex.name)}${ex.active ? '' : ' (historiek)'}</label>
-        <small>${escapeHtml(ex.routine)}</small>
+        <small>${escapeHtml(displayRoutine(ex.routine))}</small>
         <div ${selected ? '' : 'hidden'} class="backfill-fields">
           <div class="input-row">
             <div><label for="backfillSets-${ex.exercise_id}">Sets</label><input id="backfillSets-${ex.exercise_id}" type="number" min="1" max="20" value="${values.sets}" inputmode="numeric" oninput="setBackfillValue(${ex.exercise_id}, 'sets', this.value)"></div>

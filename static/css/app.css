@@ -181,9 +181,7 @@
 .cal-day { position: relative; display: grid; place-items: center; align-content: center; width: 100%; min-width: 0; aspect-ratio: 1 / 1; padding: 0; overflow: hidden; border-radius: 8px; background: var(--bg-deep); border: 1px solid var(--border); color: var(--text-dim); font: inherit; cursor: pointer; }
 .cal-day i { font: 700 .75rem/1 'Barlow', sans-serif; font-style: normal; }
 .cal-day small { font: 800 .62rem/1 'Barlow Condensed', sans-serif; letter-spacing: .5px; opacity: .9; min-height: .62rem; }
-.cal-day.l1 { background: #24492b; border-color: #2f5c37; color: var(--text-bright); }
-.cal-day.l2 { background: var(--green-jungle); border-color: #4a9a56; color: var(--text-bright); }
-.cal-day.l3 { background: #84bf82; border-color: #9bd199; color: #0d140e; }
+.cal-day.active { background: var(--green-jungle); border-color: #4a9a56; color: var(--text-bright); }
 .cal-day.cardio::after, .cal-swatch.cardio::after { content: ''; position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--gold-bright); }
 .cal-day.today { outline: 2px solid var(--gold-bright); outline-offset: 1px; }
 .cal-day.future { opacity: .25; border-style: dashed; cursor: default; display: grid; }
@@ -192,11 +190,8 @@
 .cal-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; color: var(--text-dim); font-size: .72rem; }
 .cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .cal-swatch { position: relative; display: inline-block; width: 14px; height: 14px; border-radius: 4px; background: var(--bg-deep); border: 1px solid var(--border); }
-.cal-swatch.l1 { background: #24492b; border-color: #2f5c37; }
-.cal-swatch.l2 { background: var(--green-jungle); border-color: #4a9a56; }
-.cal-swatch.l3 { background: #84bf82; border-color: #9bd199; }
+.cal-swatch.active { background: var(--green-jungle); border-color: #4a9a56; }
 .cal-swatch.today { outline: 2px solid var(--gold-bright); outline-offset: 1px; }
-.cal-note { margin-top: 8px; font-size: .75rem; line-height: 1.4; }
 
 /* Recent trainings and the detail sheets */
 .ss-ex small, .gx-row small, .gx-pr small { color: var(--text-muted); font-size: .75rem; }

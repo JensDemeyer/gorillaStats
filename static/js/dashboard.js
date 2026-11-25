@@ -114,7 +114,7 @@ const Dashboard = (() => {
     if (calendarData) renderCalendar();
   }
 
-  // One row per week: the week's start, seven days (tap for the training) and the number of active days.
+  // One row per week: month label, seven days and the number of active days.
   function renderCalendar() {
     document.querySelectorAll('#calendarRange .chip').forEach(chip => chip.classList.toggle('active', Number(chip.dataset.weeks) === calendarWeeks));
     const byDate = new Map(calendarData.calendar.map(day => [day.date, day]));
@@ -123,7 +123,7 @@ const Dashboard = (() => {
     document.getElementById('calendar').innerHTML = calendarData.weeks.slice(-calendarWeeks).map(week => {
       const start = new Date(`${week.start}T00:00:00`);
       const month = start.toLocaleDateString('nl-NL', { month: 'short' });
-      const label = `<span class="cal-label">${month !== lastMonth ? `<b>${month}</b>` : ''}<span>${start.getDate()}</span></span>`;
+      const label = `<span class="cal-label">${month !== lastMonth ? `<b>${month}</b>` : ''}</span>`;
       lastMonth = month;
       const cells = [];
       for (let offset = 0; offset < 7; offset++) {
@@ -135,14 +135,16 @@ const Dashboard = (() => {
           cells.push(`<span class="cal-day future"><i>${day.getDate()}</i></span>`);
           continue;
         }
-        const score = entry.sets + entry.minutes / 2;
-        const level = score >= 20 ? ' l3' : score >= 10 ? ' l2' : score > 0 ? ' l1' : '';
-        const initials = [...new Set((entry.routines || []).map(name => name.trim().charAt(0).toUpperCase()).filter(Boolean))].slice(0, 2).join('');
+        const activity = entry.sets > 0 || entry.minutes > 0 ? ' active' : '';
+        const initials = [...new Set((entry.routines || []).map(name => {
+          const label = displayRoutine(name.trim());
+          return label.startsWith('🅿️') ? '🅿️' : (Array.from(label)[0] || '').toUpperCase();
+        }).filter(Boolean))].slice(0, 2).join('');
         const cardio = entry.minutes > 0 ? ' cardio' : '';
         const summary = entry.sets || entry.minutes
           ? `${entry.sets ? `${entry.sets} sets, ${nl(entry.tonnage)} kg` : ''}${entry.sets && entry.minutes ? ' + ' : ''}${entry.minutes ? `${Math.round(entry.minutes)} min cardio` : ''}`
           : 'rust';
-        cells.push(`<button type="button" class="cal-day${level}${cardio}${iso === today ? ' today' : ''}" data-open-session="${iso}"
+        cells.push(`<button type="button" class="cal-day${activity}${cardio}${iso === today ? ' today' : ''}" data-open-session="${iso}"
           aria-label="${iso}: ${summary}"><i>${day.getDate()}</i><small>${escapeHtml(initials)}</small></button>`);
       }
       return `<div class="cal-week">${label}${cells.join('')}<span class="cal-sum${week.active_days >= 3 ? ' goal' : ''}">${week.active_days}/3</span></div>`;
